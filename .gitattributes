@@ -1,0 +1,5 @@
+# 基本的にすべてのテキストファイルの改行コードをLFに統一する
+* text=auto eol=lf
+
+# ただし、WindowsのバッチファイルなどはCRLFにする
+*.{cmd,bat,ps1} text eol=crlf
