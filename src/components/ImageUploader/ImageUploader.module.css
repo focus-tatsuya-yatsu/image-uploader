@@ -1,6 +1,6 @@
 .uploaderContainer {
   width: 100%;
-  max-width: 600px;
+  max-width: 500px;
   margin: 0 auto;
 }
 
@@ -8,20 +8,20 @@
   position: relative;
   width: 100%;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 24px;
-  padding: 3px;
+  border-radius: 20px;
+  padding: 2px;
   transition: all 0.3s ease;
-  box-shadow: 0 20px 40px -15px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
 }
 
 .container:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 25px 50px -15px rgba(102, 126, 234, 0.5);
+  transform: translateY(-3px);
+  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
 }
 
 .container.dragging {
   transform: scale(1.02);
-  box-shadow: 0 30px 60px -15px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 20px 40px rgba(102, 126, 234, 0.4);
 }
 
 .dropZone {
@@ -32,9 +32,9 @@
 }
 
 .content {
-  background: #1a1a2e;
-  border-radius: 21px;
-  padding: 60px 40px;
+  background: white;
+  border-radius: 18px;
+  padding: 40px 30px;
   position: relative;
   overflow: hidden;
 }
@@ -48,7 +48,7 @@
   height: 200%;
   background: radial-gradient(
     circle,
-    rgba(102, 126, 234, 0.1) 0%,
+    rgba(102, 126, 234, 0.03) 0%,
     transparent 70%
   );
   animation: rotate 20s linear infinite;
@@ -84,10 +84,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 30px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 25px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
   border-radius: 50%;
   position: relative;
 }
@@ -109,7 +109,7 @@
 
 .uploadIcon {
   color: #667eea;
-  filter: drop-shadow(0 4px 6px rgba(102, 126, 234, 0.3));
+  filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.2));
   animation: float 3s ease-in-out infinite;
 }
 
@@ -117,18 +117,18 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 140px;
-  height: 140px;
-  margin: 0 auto 30px;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 25px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
   border-radius: 50%;
   position: relative;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .dragIcon svg {
-  color: white;
-  filter: drop-shadow(0 4px 6px rgba(102, 126, 234, 0.5));
+  color: #667eea;
+  filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.3));
 }
 
 @keyframes float {
@@ -136,7 +136,7 @@
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-10px);
+    transform: translateY(-8px);
   }
 }
 
@@ -152,9 +152,9 @@
 }
 
 .title {
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: 700;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -162,45 +162,41 @@
 }
 
 .subtitle {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 1.1rem;
-  margin: 0 0 20px;
+  color: #666;
+  font-size: 1rem;
+  margin: 0 0 15px;
 }
 
 .formats {
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 0.9rem;
-  margin: 0 0 30px;
+  color: #999;
+  font-size: 0.85rem;
+  margin: 0 0 25px;
 }
 
 .dragText {
-  color: white;
-  font-size: 2.5rem;
+  color: #667eea;
+  font-size: 2.2rem;
   font-weight: 700;
   margin: 0;
-  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  text-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
 }
 
 .selectButton {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
-  padding: 14px 32px;
+  padding: 12px 28px;
   border-radius: 50px;
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 10px 20px -10px rgba(102, 126, 234, 0.5);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
 }
 
 .selectButton:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px -10px rgba(102, 126, 234, 0.6);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
 }
 
 .selectButton:active {
@@ -208,11 +204,11 @@
 }
 
 .loader {
-  width: 200px;
+  width: 180px;
   height: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #f0f2f5;
   border-radius: 2px;
-  margin: 0 auto 20px;
+  margin: 0 auto 15px;
   overflow: hidden;
 }
 
@@ -233,78 +229,78 @@
 }
 
 .statusText {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 1.2rem;
+  color: #666;
+  font-size: 1.1rem;
   font-weight: 500;
   margin: 0;
 }
 
 .successIcon {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 20px;
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 15px;
   background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: bold;
-  box-shadow: 0 20px 40px -15px rgba(0, 184, 148, 0.5);
+  box-shadow: 0 10px 25px rgba(0, 184, 148, 0.3);
 }
 
 .errorIcon {
-  width: 80px;
-  height: 80px;
-  margin: 0 auto 20px;
+  width: 70px;
+  height: 70px;
+  margin: 0 auto 15px;
   background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: bold;
-  box-shadow: 0 20px 40px -15px rgba(255, 107, 107, 0.5);
+  box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
 }
 
 .errorText {
   color: #ff6b6b;
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin: 0;
 }
 
 @media (max-width: 768px) {
   .content {
-    padding: 40px 20px;
+    padding: 30px 20px;
   }
   
   .title {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
   }
   
   .subtitle {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
   
   .iconWrapper,
   .dragIcon {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
   }
   
   .uploadIcon {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .dragIcon svg {
     width: 60px;
     height: 60px;
   }
   
-  .dragIcon svg {
-    width: 70px;
-    height: 70px;
-  }
-  
   .dragText {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
 }

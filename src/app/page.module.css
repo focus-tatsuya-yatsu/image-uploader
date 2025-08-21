@@ -1,8 +1,10 @@
 .container {
-  min-height: 100vh;
+  height: 100vh;
   position: relative;
   overflow: hidden;
-  background: #0f0f23;
+  background: #f8f9fa;
+  display: flex;
+  flex-direction: column;
 }
 
 .backgroundAnimation {
@@ -16,7 +18,7 @@
   position: absolute;
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(102, 126, 234, 0.3) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(102, 126, 234, 0.08) 0%, transparent 70%);
   border-radius: 50%;
   top: -200px;
   left: -200px;
@@ -28,7 +30,7 @@
   position: absolute;
   width: 800px;
   height: 800px;
-  background: radial-gradient(circle, rgba(118, 75, 162, 0.3) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(118, 75, 162, 0.08) 0%, transparent 70%);
   border-radius: 50%;
   bottom: -300px;
   right: -300px;
@@ -40,7 +42,7 @@
   position: absolute;
   width: 500px;
   height: 500px;
-  background: radial-gradient(circle, rgba(102, 126, 234, 0.2) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(102, 126, 234, 0.06) 0%, transparent 70%);
   border-radius: 50%;
   top: 50%;
   left: 50%;
@@ -84,15 +86,16 @@
 
 .header {
   text-align: center;
-  padding: 60px 20px 40px;
+  padding: 30px 20px 20px;
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
 }
 
 .title {
-  font-size: 4rem;
+  font-size: 3rem;
   font-weight: 900;
-  margin: 0 0 20px;
+  margin: 0 0 10px;
   letter-spacing: -2px;
 }
 
@@ -118,40 +121,53 @@
 }
 
 .subtitle {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 1.2rem;
+  color: #666666;
+  font-size: 1.1rem;
   font-weight: 400;
   margin: 0;
 }
 
 .main {
-  padding: 40px 20px 100px;
+  padding: 20px;
   position: relative;
   z-index: 1;
   max-width: 1200px;
   margin: 0 auto;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .recentSection {
-  margin-top: 80px;
+  margin-top: 30px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .recentTitle {
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  margin: 0 0 30px;
+  margin: 0 0 20px;
   text-align: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  flex-shrink: 0;
 }
 
 .recentGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
   padding: 0 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
 }
 
 .recentImageWrapper {
@@ -160,22 +176,16 @@
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 2px;
-  transition: box-shadow 0.3s ease;
+  background: white;
+  border: 2px solid #e1e8ed;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .recentImageWrapper:hover {
-  box-shadow: 0 10px 30px -10px rgba(102, 126, 234, 0.5);
-}
-
-.recentImageWrapper::before {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  background: #1a1a2e;
-  border-radius: 14px;
-  z-index: 0;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
+  border-color: #667eea;
+  transform: translateY(-2px);
 }
 
 .recentImage {
@@ -185,8 +195,8 @@
   object-fit: contain;
   border-radius: 14px;
   z-index: 1;
-  background: rgba(255, 255, 255, 0.03);
   padding: 10px;
+  background: white;
 }
 
 .deleteButton {
@@ -196,9 +206,9 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: white;
+  background: white;
+  border: 2px solid #e1e8ed;
+  color: #666;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,7 +216,7 @@
   z-index: 3;
   opacity: 0;
   transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .recentImageWrapper:hover .deleteButton {
@@ -214,8 +224,9 @@
 }
 
 .deleteButton:hover {
-  background: rgba(255, 107, 107, 0.8);
-  border-color: rgba(255, 107, 107, 0.5);
+  background: #ff6b6b;
+  border-color: #ff6b6b;
+  color: white;
   transform: scale(1.1);
 }
 
@@ -228,7 +239,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
   padding: 20px 15px 15px;
   z-index: 2;
   opacity: 0;
@@ -241,20 +252,18 @@
 
 .recentImageName {
   color: white;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
 .footer {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
   text-align: center;
-  padding: 20px;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.9rem;
+  padding: 15px;
+  color: #999999;
+  font-size: 0.85rem;
   z-index: 1;
+  flex-shrink: 0;
+  background: rgba(248, 249, 250, 0.8);
 }
 
 .footer p {
@@ -267,7 +276,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
@@ -276,48 +285,30 @@
 }
 
 .confirmContent {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: white;
   border-radius: 20px;
-  padding: 3px;
   max-width: 400px;
   width: 90%;
-}
-
-.confirmContent::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  background: #1a1a2e;
-  border-radius: 17px;
-  z-index: -1;
-}
-
-.confirmContent {
-  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
 }
 
 .confirmContent h3 {
   margin: 0;
   padding: 25px 25px 15px;
   font-size: 1.4rem;
-  background: #1a1a2e;
-  border-radius: 17px 17px 0 0;
-  color: white;
+  color: #333;
 }
 
 .confirmContent p {
   margin: 0;
   padding: 0 25px 20px;
-  color: rgba(255, 255, 255, 0.7);
-  background: #1a1a2e;
+  color: #666;
 }
 
 .confirmButtons {
   display: flex;
   gap: 12px;
   padding: 0 25px 25px;
-  background: #1a1a2e;
-  border-radius: 0 0 17px 17px;
 }
 
 .cancelButton,
@@ -333,13 +324,13 @@
 }
 
 .cancelButton {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: #f0f2f5;
+  color: #666;
+  border: 1px solid #e1e8ed;
 }
 
 .cancelButton:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: #e1e8ed;
   transform: translateY(-2px);
 }
 
@@ -350,12 +341,12 @@
 .confirmButton {
   background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
   color: white;
-  box-shadow: 0 10px 20px -10px rgba(255, 107, 107, 0.5);
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
 }
 
 .confirmButton:hover {
   transform: translateY(-2px);
-  box-shadow: 0 15px 30px -10px rgba(255, 107, 107, 0.6);
+  box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
 }
 
 .confirmButton:active {
@@ -364,25 +355,26 @@
 
 @media (max-width: 768px) {
   .title {
-    font-size: 2.5rem;
+    font-size: 2rem;
   }
   
   .subtitle {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
   
   .header {
-    padding: 40px 20px 30px;
+    padding: 20px 15px;
   }
   
   .recentGrid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
     padding: 0;
   }
   
   .recentTitle {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
+    margin-bottom: 15px;
   }
   
   .confirmContent {

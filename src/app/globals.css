@@ -7,9 +7,10 @@
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
-  background: #0f0f23;
-  color: #ffffff;
+  height: 100vh;
+  overflow: hidden;
+  background: #f8f9fa;
+  color: #333333;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
     Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -18,7 +19,7 @@ body {
 
 body {
   position: relative;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 a {
@@ -37,7 +38,7 @@ button {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
   border-radius: 5px;
 }
 
@@ -71,8 +72,8 @@ button {
 
 /* 選択時のハイライト色 */
 ::selection {
-  background-color: rgba(102, 126, 234, 0.3);
-  color: #ffffff;
+  background-color: rgba(102, 126, 234, 0.2);
+  color: #333333;
 }
 
 /* モバイル対応 */
