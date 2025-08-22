@@ -86,17 +86,17 @@
 
 .header {
   text-align: center;
-  padding: 30px 20px 20px;
+  padding: 15px 20px 10px;
   position: relative;
   z-index: 1;
   flex-shrink: 0;
 }
 
 .title {
-  font-size: 3rem;
+  font-size: 2.2rem;
   font-weight: 900;
-  margin: 0 0 10px;
-  letter-spacing: -2px;
+  margin: 0 0 5px;
+  letter-spacing: -1px;
 }
 
 .titleGradient {
@@ -122,272 +122,460 @@
 
 .subtitle {
   color: #666666;
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   font-weight: 400;
   margin: 0;
 }
 
 .main {
-  padding: 20px;
+  padding: 15px 20px;
   position: relative;
   z-index: 1;
-  max-width: 1200px;
-  margin: 0 auto;
   width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
-.recentSection {
-  margin-top: 30px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.recentTitle {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0 0 20px;
-  text-align: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  flex-shrink: 0;
-}
-
-.recentGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 15px;
-  padding: 0 20px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1;
-}
-
-.recentImageWrapper {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: 16px;
-  overflow: hidden;
-  cursor: pointer;
-  background: white;
-  border: 2px solid #e1e8ed;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.recentImageWrapper:hover {
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.2);
-  border-color: #667eea;
-  transform: translateY(-2px);
-}
-
-.recentImage {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 14px;
-  z-index: 1;
-  padding: 10px;
-  background: white;
-}
-
-.deleteButton {
+/* リセットボタン */
+.resetButton {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: white;
-  border: 2px solid #e1e8ed;
-  color: #666;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 3;
-  opacity: 0;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.recentImageWrapper:hover .deleteButton {
-  opacity: 1;
-}
-
-.deleteButton:hover {
-  background: #ff6b6b;
-  border-color: #ff6b6b;
+  top: 15px;
+  right: 20px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
   color: white;
-  transform: scale(1.1);
-}
-
-.deleteButton:active {
-  transform: scale(0.95);
-}
-
-.recentImageOverlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
-  padding: 20px 15px 15px;
-  z-index: 2;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.recentImageWrapper:hover .recentImageOverlay {
-  opacity: 1;
-}
-
-.recentImageName {
-  color: white;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.footer {
-  text-align: center;
-  padding: 15px;
-  color: #999999;
-  font-size: 0.85rem;
-  z-index: 1;
-  flex-shrink: 0;
-  background: rgba(248, 249, 250, 0.8);
-}
-
-.footer p {
-  margin: 0;
-}
-
-.confirmDialog {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-}
-
-.confirmContent {
-  background: white;
-  border-radius: 20px;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-}
-
-.confirmContent h3 {
-  margin: 0;
-  padding: 25px 25px 15px;
-  font-size: 1.4rem;
-  color: #333;
-}
-
-.confirmContent p {
-  margin: 0;
-  padding: 0 25px 20px;
-  color: #666;
-}
-
-.confirmButtons {
-  display: flex;
-  gap: 12px;
-  padding: 0 25px 25px;
-}
-
-.cancelButton,
-.confirmButton {
-  flex: 1;
-  padding: 12px 24px;
   border: none;
-  border-radius: 10px;
-  font-size: 1rem;
+  padding: 8px 18px;
+  border-radius: 25px;
+  font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-}
-
-.cancelButton {
-  background: #f0f2f5;
-  color: #666;
-  border: 1px solid #e1e8ed;
-}
-
-.cancelButton:hover {
-  background: #e1e8ed;
-  transform: translateY(-2px);
-}
-
-.cancelButton:active {
-  transform: translateY(0);
-}
-
-.confirmButton {
-  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
-  color: white;
   box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.confirmButton:hover {
+.resetButton:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
 }
 
-.confirmButton:active {
-  transform: translateY(0);
+/* レイアウトコンテナ */
+.initialLayout {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
 }
 
+.singleImageLayout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  min-height: 0;
+  padding-top: 50px;
+}
+
+.doubleImageLayout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  min-height: 0;
+  padding-top: 50px;
+}
+
+/* アップロードエリア */
+.uploadContainer {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  padding: 2px;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.2);
+  height: fit-content;
+}
+
+.uploadContainer.secondUpload {
+  max-width: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.uploadContainer.secondUpload .dropZone,
+.uploadContainer.secondUpload .content {
+  height: 100%;
+}
+
+.uploadContainer.secondUpload .content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.uploadContainer:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 35px rgba(102, 126, 234, 0.3);
+}
+
+.uploadContainer.dragging {
+  transform: scale(1.02);
+  box-shadow: 0 20px 40px rgba(102, 126, 234, 0.4);
+}
+
+.dropZone {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.content {
+  background: white;
+  border-radius: 18px;
+  padding: 30px 25px;
+  position: relative;
+  overflow: hidden;
+}
+
+.fileInput {
+  display: none;
+}
+
+.uploadArea {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  display: block;
+  cursor: pointer;
+}
+
+.iconWrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 50%;
+  position: relative;
+}
+
+.uploadIcon {
+  color: #667eea;
+  filter: drop-shadow(0 2px 4px rgba(102, 126, 234, 0.2));
+  animation: float 3s ease-in-out infinite;
+  width: 60px;
+  height: 60px;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.uploadTitle {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 6px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.uploadSubtitle {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0 0 12px;
+}
+
+.formats {
+  color: #999;
+  font-size: 0.75rem;
+  margin: 0 0 20px;
+}
+
+.selectButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.3);
+  pointer-events: none;
+}
+
+.uploadArea:hover .selectButton {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+}
+
+.dragActiveArea,
+.statusArea {
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.dragIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 20px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
+  border-radius: 50%;
+  position: relative;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.dragText {
+  color: #667eea;
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin: 0;
+  text-shadow: 0 2px 4px rgba(102, 126, 234, 0.1);
+}
+
+.loader {
+  width: 160px;
+  height: 4px;
+  background: #f0f2f5;
+  border-radius: 2px;
+  margin: 0 auto 12px;
+  overflow: hidden;
+}
+
+.loaderBar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
+.statusText {
+  color: #666;
+  font-size: 1rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.successIcon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 12px;
+  background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 2rem;
+  font-weight: bold;
+  box-shadow: 0 10px 25px rgba(0, 184, 148, 0.3);
+}
+
+.errorIcon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 12px;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 2rem;
+  font-weight: bold;
+  box-shadow: 0 10px 25px rgba(255, 107, 107, 0.3);
+}
+
+.errorText {
+  color: #ff6b6b;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* 画像カード */
+.imageCard {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.imageHeader {
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.imageHeader h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.deleteButton {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.deleteButton:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.imageInfo {
+  padding: 12px 18px;
+  border-bottom: 1px solid #e1e8ed;
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.fileName {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileSize {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.imageWrapper {
+  flex: 1;
+  overflow: auto;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafbfc;
+  min-height: 0;
+}
+
+.displayedImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* モバイル対応 */
 @media (max-width: 768px) {
   .title {
-    font-size: 2rem;
+    font-size: 1.6rem;
   }
   
   .subtitle {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
   }
   
   .header {
-    padding: 20px 15px;
+    padding: 12px 15px 8px;
   }
   
-  .recentGrid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px;
-    padding: 0;
+  .main {
+    padding: 12px 15px;
   }
   
-  .recentTitle {
-    font-size: 1.3rem;
+  .singleImageLayout,
+  .doubleImageLayout {
+    grid-template-columns: 1fr;
+    padding-top: 45px;
+  }
+  
+  .uploadContainer.secondUpload {
+    max-height: 300px;
+  }
+  
+  .imageCard {
+    max-height: calc(50vh - 80px);
+  }
+  
+  .resetButton {
+    padding: 6px 14px;
+    font-size: 0.8rem;
+  }
+  
+  .uploadTitle {
+    font-size: 1.2rem;
+  }
+  
+  .iconWrapper {
+    width: 60px;
+    height: 60px;
     margin-bottom: 15px;
   }
   
-  .confirmContent {
-    width: 95%;
-  }
-  
-  .confirmContent h3 {
-    font-size: 1.2rem;
-    padding: 20px 20px 12px;
-  }
-  
-  .confirmButtons {
-    flex-direction: column;
-    gap: 10px;
+  .uploadIcon {
+    width: 40px;
+    height: 40px;
   }
 }
