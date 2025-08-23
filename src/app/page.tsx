@@ -26,6 +26,7 @@ const SUPPORTED_FORMATS = [
   'image/vnd.adobe.photoshop',
   'image/webp',
   'image/svg+xml',
+  'application/pdf',
 ]
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
@@ -169,6 +170,16 @@ export default function Home() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
+  const getFileTypeDisplay = (type: string): string => {
+    if (type === 'application/pdf') return 'PDF'
+    if (type.startsWith('image/')) return type.split('/')[1].toUpperCase()
+    return 'FILE'
+  }
+
+  const isPDF = (type: string): boolean => {
+    return type === 'application/pdf'
+  }
+
   return (
     <div className={styles.container}>
       {/* 背景アニメーション */}
@@ -200,7 +211,7 @@ export default function Home() {
           <button 
             className={styles.resetButton}
             onClick={handleReset}
-            title="すべての画像を削除"
+            title="すべてのファイルを削除"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14M10 11v6M14 11v6"/>
@@ -234,7 +245,7 @@ export default function Home() {
               >
                 <input
                   type="file"
-                  accept="image/*,.psd"
+                  accept="image/*,.psd,.pdf,application/pdf"
                   onChange={handleFileSelect}
                   className={styles.fileInput}
                   id="fileInput"
@@ -273,7 +284,7 @@ export default function Home() {
                           ドラッグ&ドロップまたはクリックして選択
                         </p>
                         <p className={styles.formats}>
-                          対応形式: JPEG, PNG, GIF, TIFF, PSD, WebP, SVG
+                          対応形式: PDF, JPEG, PNG, GIF, TIFF, PSD, WebP, SVG
                         </p>
                         <button className={styles.selectButton}>
                           ファイルを選択
@@ -377,7 +388,7 @@ export default function Home() {
                   <button
                     className={styles.deleteButton}
                     onClick={() => handleDeleteImage(uploadedImages[0].id)}
-                    title="画像を削除"
+                    title="ファイルを削除"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -388,15 +399,25 @@ export default function Home() {
                 <div className={styles.imageInfo}>
                   <p className={styles.fileName}>{uploadedImages[0].name}</p>
                   <p className={styles.fileSize}>
-                    {formatFileSize(uploadedImages[0].size)} • {uploadedImages[0].type.split('/')[1].toUpperCase()}
+                    {formatFileSize(uploadedImages[0].size)} • {getFileTypeDisplay(uploadedImages[0].type)}
                   </p>
                 </div>
                 <div className={styles.imageWrapper}>
-                  <img
-                    src={uploadedImages[0].url}
-                    alt={uploadedImages[0].name}
-                    className={styles.displayedImage}
-                  />
+                  {isPDF(uploadedImages[0].type) ? (
+                    <embed
+                      src={uploadedImages[0].url}
+                      type="application/pdf"
+                      className={styles.pdfViewer}
+                      width="100%"
+                      height="100%"
+                    />
+                  ) : (
+                    <img
+                      src={uploadedImages[0].url}
+                      alt={uploadedImages[0].name}
+                      className={styles.displayedImage}
+                    />
+                  )}
                 </div>
               </motion.div>
 
@@ -416,7 +437,7 @@ export default function Home() {
                 >
                   <input
                     type="file"
-                    accept="image/*,.psd"
+                    accept="image/*,.psd,.pdf,application/pdf"
                     onChange={handleFileSelect}
                     className={styles.fileInput}
                     id="fileInput2"
@@ -455,7 +476,7 @@ export default function Home() {
                             ドラッグ&ドロップまたはクリックして選択
                           </p>
                           <p className={styles.formats}>
-                            対応形式: JPEG, PNG, GIF, TIFF, PSD, WebP, SVG
+                            対応形式: PDF, JPEG, PNG, GIF, TIFF, PSD, WebP, SVG
                           </p>
                           <button className={styles.selectButton}>
                             ファイルを選択
@@ -561,7 +582,7 @@ export default function Home() {
                     <button
                       className={styles.deleteButton}
                       onClick={() => handleDeleteImage(image.id)}
-                      title="画像を削除"
+                      title="ファイルを削除"
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -572,15 +593,25 @@ export default function Home() {
                   <div className={styles.imageInfo}>
                     <p className={styles.fileName}>{image.name}</p>
                     <p className={styles.fileSize}>
-                      {formatFileSize(image.size)} • {image.type.split('/')[1].toUpperCase()}
+                      {formatFileSize(image.size)} • {getFileTypeDisplay(image.type)}
                     </p>
                   </div>
                   <div className={styles.imageWrapper}>
-                    <img
-                      src={image.url}
-                      alt={image.name}
-                      className={styles.displayedImage}
-                    />
+                    {isPDF(image.type) ? (
+                      <embed
+                        src={image.url}
+                        type="application/pdf"
+                        className={styles.pdfViewer}
+                        width="100%"
+                        height="100%"
+                      />
+                    ) : (
+                      <img
+                        src={image.url}
+                        alt={image.name}
+                        className={styles.displayedImage}
+                      />
+                    )}
                   </div>
                 </motion.div>
               ))}
