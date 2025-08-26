@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import styles from './page.module.css'
+import Link from 'next/link'
 
 // 画像ファイルの型定義
 interface ImageFile {
@@ -202,6 +203,24 @@ export default function Home() {
         <p className={styles.subtitle}>
           図面と測定結果を並べて表示できます（最大2ファイルまで）
         </p>
+          {/* 測定値転記システムへのリンクボタンを追加 */}
+          <Link 
+          href="/measurement" 
+          style={{
+            marginTop: '15px',
+            display: 'inline-block',
+            background: 'white',
+            color: '#667eea',
+            padding: '10px 25px',
+            borderRadius: '25px',
+            textDecoration: 'none',
+            fontWeight: 'bold',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            transition: 'transform 0.3s'
+          }}
+        >
+          🔧 測定値転記システムへ
+        </Link>
       </motion.header>
 
       {/* メインコンテンツ */}
