@@ -544,7 +544,7 @@ const MeasurementPage = () => {
       overflow: 'hidden'
     },
     header: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #DDDDDD 10%, #888888 100%)',
       color: 'white',
       padding: '20px',
       textAlign: 'center' as const,
@@ -555,13 +555,23 @@ const MeasurementPage = () => {
       left: '20px',
       top: '50%',
       transform: 'translateY(-50%)',
-      background: 'rgba(255,255,255,0.2)',
-      border: '2px solid white',
-      color: 'white',
+      background: 'white',
+      border: '2px solid #667eea',
+      color: '#667eea',
       padding: '8px 16px',
       borderRadius: '20px',
       cursor: 'pointer',
       fontWeight: 'bold' as const
+    },
+    logo: {
+      position: 'absolute' as const,
+      right: '950px',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      height: '5rem',
+      width: 'auto',
+      maxWidth: '120px',
+      objectFit: 'contain' as const
     },
     controls: {
       padding: '20px',
@@ -738,7 +748,12 @@ const MeasurementPage = () => {
           <button style={styles.homeButton} onClick={goToHome}>
             ← ホーム
           </button>
-          <h1>🔧 図面測定値転記システム</h1>
+          <img
+    src="/logo.png"
+    alt="KYORITSU Logo"
+    style={styles.logo}
+  />
+          <h1> 図面測定値転記システム</h1>
           <p>図面上にボックスを作成して、測定結果を自動転記します</p>
         </div>
         
