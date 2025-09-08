@@ -71,7 +71,7 @@ const MeasurementPage = () => {
   const [defaultDecimalPlaces, setDefaultDecimalPlaces] = useState(2)
   const [editingBoxId, setEditingBoxId] = useState<number | null>(null)
   const [editingValue, setEditingValue] = useState('')
-  const [minBoxSize, setMinBoxSize] = useState(5) // 最小ボックスサイズを5pxに変更
+  const [minBoxSize, setMinBoxSize] = useState(3) // 最小ボックスサイズを3pxに変更
   
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -132,6 +132,21 @@ const MeasurementPage = () => {
     return numValue.toFixed(decimalPlaces)
   }
 
+  // ボックスの線幅を動的に計算する関数
+  const calculateBorderWidth = (boxWidth: number, boxHeight: number, scale: number): number => {
+    const minSize = Math.min(boxWidth, boxHeight)
+    const baseWidth = minSize < 20 ? 1 : minSize < 50 ? 1.5 : 2
+    // ズームレベルが高い時は線を細くする
+    const scaledWidth = baseWidth / Math.max(1, scale / 2)
+    return Math.max(0.5, scaledWidth)
+  }
+
+  // ズームレベルに応じた要素サイズを計算する関数
+  const getScaledElementSize = (baseSize: number, scale: number): number => {
+    // スケールが大きくなるほど要素を小さくする
+    return baseSize / Math.max(1, scale / 2)
+  }
+
   // 座標変換関数（ズーム・パン対応）
   const screenToCanvas = (screenX: number, screenY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect()
@@ -143,7 +158,7 @@ const MeasurementPage = () => {
     return { x, y }
   }
 
-  // ズーム処理
+  // ズーム処理（最大1000倍に拡張）
   const handleWheel = useCallback((e: WheelEvent) => {
     if (!canvasRef.current || drawMode) return
     e.preventDefault()
@@ -153,7 +168,7 @@ const MeasurementPage = () => {
     const mouseY = e.clientY - rect.top
     
     const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1
-    const newScale = Math.min(Math.max(viewTransform.scale * scaleFactor, 0.5), 10) // 最大ズームを10倍に拡張
+    const newScale = Math.min(Math.max(viewTransform.scale * scaleFactor, 0.5), 1000) // 最大ズームを1000倍に拡張
     
     // マウス位置を中心にズーム
     const scaleChange = newScale - viewTransform.scale
@@ -533,7 +548,7 @@ const MeasurementPage = () => {
     
     setIsDrawing(false)
     
-    // 最小サイズを5pxに緩和（以前は10px）
+    // 最小サイズを3pxに緩和（以前は5px）
     if (currentBox.width > minBoxSize && currentBox.height > minBoxSize) {
       setBoxes(prev => [...prev, currentBox])
     }
@@ -641,7 +656,7 @@ const MeasurementPage = () => {
   // スタイル定義
   const styles = {
     container: {
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      fontFamily: '"Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       minHeight: '100vh',
       padding: '20px'
@@ -687,7 +702,8 @@ const MeasurementPage = () => {
       padding: '10px 20px',
       borderRadius: '25px',
       cursor: 'pointer',
-      fontWeight: '600'
+      fontWeight: '600',
+      fontFamily: '"Noto Sans JP", sans-serif'
     },
     actionBtn: (active: boolean) => ({
       padding: '8px 16px',
@@ -696,7 +712,8 @@ const MeasurementPage = () => {
       background: active ? '#667eea' : 'white',
       color: active ? 'white' : '#667eea',
       cursor: 'pointer',
-      fontWeight: '600'
+      fontWeight: '600',
+      fontFamily: '"Noto Sans JP", sans-serif'
     }),
     mainContent: {
       display: 'grid',
@@ -743,11 +760,13 @@ const MeasurementPage = () => {
       MozUserDrag: 'none' as const,
       userDrag: 'none' as const
     },
-    box: (isVertical: boolean, fontSize: number, textColor: string, isEditing: boolean) => ({
+    box: (isVertical: boolean, fontSize: number, textColor: string, isEditing: boolean, borderWidth: number) => ({
       position: 'absolute' as const,
       border: isEditing 
-        ? '3px solid #00ff00' 
-        : textColor === 'white' ? '2px solid #ffffff' : '2px solid #ff6b6b',
+        ? `${Math.max(2, borderWidth)}px solid #00ff00` 
+        : textColor === 'white' 
+          ? `${borderWidth}px solid #ffffff` 
+          : `${borderWidth}px solid #ff6b6b`,
       background: isEditing
         ? 'rgba(0, 255, 0, 0.1)'
         : textColor === 'white' 
@@ -760,25 +779,28 @@ const MeasurementPage = () => {
       writingMode: isVertical ? ('vertical-rl' as const) : ('horizontal-tb' as const),
       textOrientation: isVertical ? ('upright' as const) : ('mixed' as const),
       userSelect: 'none' as const,
-      fontSize: `${fontSize}px`
+      fontSize: `${fontSize}px`,
+      fontFamily: '"Noto Sans JP", sans-serif'
     }),
-    boxNumber: (textColor: string) => ({
+    boxNumber: (textColor: string, scaledSize: number) => ({
       position: 'absolute' as const,
-      top: '-25px',
+      top: `-${scaledSize + 10}px`,
       left: '0',
       background: textColor === 'white' ? '#ffffff' : '#ff6b6b',
       color: textColor === 'white' ? '#000000' : 'white',
-      padding: '2px 8px',
-      borderRadius: '12px',
-      fontSize: '12px',
+      padding: `${scaledSize * 0.15}px ${scaledSize * 0.6}px`,
+      borderRadius: `${scaledSize * 0.9}px`,
+      fontSize: `${scaledSize}px`,
       fontWeight: 'bold' as const,
       writingMode: 'horizontal-tb' as const,
-      zIndex: 10
+      zIndex: 10,
+      fontFamily: '"Noto Sans JP", sans-serif'
     }),
     boxValue: (textColor: string) => ({
       fontWeight: 'bold' as const,
       color: textColor === 'white' ? '#ffffff' : '#333333',
-      padding: '2px'
+      padding: '2px',
+      fontFamily: '"Noto Sans JP", sans-serif'
     }),
     editInput: {
       position: 'absolute' as const,
@@ -792,7 +814,8 @@ const MeasurementPage = () => {
       border: '2px solid #00ff00',
       borderRadius: '4px',
       background: 'white',
-      zIndex: 100
+      zIndex: 100,
+      fontFamily: '"Noto Sans JP", sans-serif'
     },
     measurementList: {
       background: 'white',
@@ -809,25 +832,29 @@ const MeasurementPage = () => {
       borderRadius: '8px',
       display: 'flex',
       justifyContent: 'space-between',
-      fontSize: '14px'
+      fontSize: '14px',
+      fontFamily: '"Noto Sans JP", sans-serif'
     }),
-    deleteBtn: (textColor: string) => ({
+    deleteBtn: (textColor: string, scaledSize: number) => ({
       position: 'absolute' as const,
-      top: '5px',
-      right: '5px',
+      top: `${scaledSize * 0.3}px`,
+      right: `${scaledSize * 0.3}px`,
       background: textColor === 'white' ? 'rgba(255,255,255,0.9)' : 'white',
-      border: textColor === 'white' ? '1px solid #ffffff' : '1px solid #ff6b6b',
+      border: textColor === 'white' 
+        ? `${Math.max(1, scaledSize * 0.05)}px solid #ffffff` 
+        : `${Math.max(1, scaledSize * 0.05)}px solid #ff6b6b`,
       borderRadius: '50%',
-      width: '20px',
-      height: '20px',
+      width: `${scaledSize * 1.3}px`,
+      height: `${scaledSize * 1.3}px`,
       cursor: 'pointer',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '12px',
+      fontSize: `${scaledSize * 0.8}px`,
       color: textColor === 'white' ? '#000000' : '#ff6b6b',
       fontWeight: 'bold' as const,
-      zIndex: 10
+      zIndex: 10,
+      fontFamily: '"Noto Sans JP", sans-serif'
     }),
     errorMessage: {
       background: '#f8d7da',
@@ -849,7 +876,8 @@ const MeasurementPage = () => {
       boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
       whiteSpace: 'nowrap' as const,
       border: '1px solid rgba(255,255,255,0.2)',
-      backdropFilter: 'blur(8px)'
+      backdropFilter: 'blur(8px)',
+      fontFamily: '"Noto Sans JP", sans-serif'
     },
     contextMenu: {
       position: 'fixed' as const,
@@ -868,7 +896,8 @@ const MeasurementPage = () => {
       transition: 'background 0.2s',
       display: 'flex',
       justifyContent: 'space-between',
-      alignItems: 'center'
+      alignItems: 'center',
+      fontFamily: '"Noto Sans JP", sans-serif'
     },
     zoomInfo: {
       position: 'absolute' as const,
@@ -879,7 +908,8 @@ const MeasurementPage = () => {
       padding: '4px 8px',
       borderRadius: '4px',
       fontSize: '12px',
-      zIndex: 100
+      zIndex: 100,
+      fontFamily: '"Noto Sans JP", sans-serif'
     },
     decimalControl: {
       display: 'flex',
@@ -1037,7 +1067,7 @@ const MeasurementPage = () => {
               min="3"
               max="20"
               value={minBoxSize}
-              onChange={(e) => setMinBoxSize(parseInt(e.target.value) || 5)}
+              onChange={(e) => setMinBoxSize(parseInt(e.target.value) || 3)}
               style={{ width: '50px', padding: '2px 5px', borderRadius: '5px', border: '1px solid #ccc' }}
             />
             <span>px</span>
@@ -1076,11 +1106,16 @@ const MeasurementPage = () => {
                     : 14
                   const isEditing = editingBoxId === box.id
                   
+                  // 動的な線幅とUI要素サイズの計算
+                  const borderWidth = calculateBorderWidth(box.width, box.height, viewTransform.scale)
+                  const scaledNumberSize = getScaledElementSize(14, viewTransform.scale)
+                  const scaledDeleteBtnSize = getScaledElementSize(16, viewTransform.scale)
+                  
                   return (
                     <div
                       key={box.id}
                       style={{
-                        ...styles.box(isVertical, fontSize, textColorMode, isEditing),
+                        ...styles.box(isVertical, fontSize, textColorMode, isEditing, borderWidth),
                         left: `${box.x}px`,
                         top: `${box.y}px`,
                         width: `${box.width}px`,
@@ -1119,7 +1154,7 @@ const MeasurementPage = () => {
                       }}
                       onMouseLeave={() => setHoveredBox(null)}
                     >
-                      <span style={styles.boxNumber(textColorMode)}>
+                      <span style={styles.boxNumber(textColorMode, scaledNumberSize)}>
                         {box.index + 1}
                         {box.isManuallyEdited && ' ✏️'}
                       </span>
@@ -1151,7 +1186,7 @@ const MeasurementPage = () => {
                       
                       {!drawMode && !isEditing && (
                         <button
-                          style={styles.deleteBtn(textColorMode)}
+                          style={styles.deleteBtn(textColorMode, scaledDeleteBtnSize)}
                           onClick={(e) => {
                             e.stopPropagation()
                             deleteBox(box.id)
@@ -1172,7 +1207,8 @@ const MeasurementPage = () => {
                         currentBox.height > currentBox.width * 1.5,
                         14,
                         textColorMode,
-                        false
+                        false,
+                        calculateBorderWidth(currentBox.width, currentBox.height, viewTransform.scale)
                       ),
                       left: `${currentBox.x}px`,
                       top: `${currentBox.y}px`,
@@ -1181,7 +1217,10 @@ const MeasurementPage = () => {
                       opacity: 0.5
                     }}
                   >
-                    <span style={{ fontSize: '10px', opacity: 0.7 }}>
+                    <span style={{ 
+                      fontSize: `${getScaledElementSize(10, viewTransform.scale)}px`, 
+                      opacity: 0.7 
+                    }}>
                       {Math.round(currentBox.width)}×{Math.round(currentBox.height)}px
                     </span>
                   </div>
@@ -1282,7 +1321,7 @@ const MeasurementPage = () => {
                 <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
                   <li><strong>ダブルクリック</strong>: 値を手動編集</li>
                   <li><strong>右クリック</strong>: 小数点桁数を変更</li>
-                  <li><strong>移動モード + マウスホイール</strong>: ズーム（最大10倍）</li>
+                  <li><strong>移動モード + マウスホイール</strong>: ズーム（最大1000倍）</li>
                   <li><strong>移動モード + ドラッグ</strong>: 画面移動</li>
                   <li><strong>最小ボックスサイズ</strong>: 調整可能（3〜20px）</li>
                   <li><strong>✏️マーク</strong>: 手動編集されたボックス</li>
