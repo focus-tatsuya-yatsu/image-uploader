@@ -13,7 +13,7 @@ interface Box {
   value: string | null
   index: number
   decimalPlaces: number
-  isManuallyEdited?: boolean // 手動編集フラグ
+  isManuallyEdited?: boolean
 }
 
 interface Measurement {
@@ -54,7 +54,7 @@ const MeasurementPage = () => {
   const [textColorMode, setTextColorMode] = useState<'black' | 'white'>('black')
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
   
-  // 新規追加State
+  // 既存State（続き）
   const [contextMenu, setContextMenu] = useState<ContextMenu>({
     visible: false,
     x: 0,
@@ -71,7 +71,12 @@ const MeasurementPage = () => {
   const [defaultDecimalPlaces, setDefaultDecimalPlaces] = useState(2)
   const [editingBoxId, setEditingBoxId] = useState<number | null>(null)
   const [editingValue, setEditingValue] = useState('')
-  const [minBoxSize, setMinBoxSize] = useState(3) // 最小ボックスサイズを3pxに変更
+  const [minBoxSize, setMinBoxSize] = useState(3)
+  
+  // 新規追加State
+  const [minFontSize, setMinFontSize] = useState(2) // 最小フォントサイズ（1〜6px）
+  const [showBoxNumbers, setShowBoxNumbers] = useState(true) // ボックス番号の表示/非表示
+  const [showDeleteButtons, setShowDeleteButtons] = useState(true) // 削除ボタンの表示/非表示
   
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -124,7 +129,7 @@ const MeasurementPage = () => {
     }
   }, [editingBoxId])
 
-  // 値のフォーマット関数（小数点桁数対応）
+  // 値のフォーマット関数
   const formatValue = (value: string | null, decimalPlaces: number): string => {
     if (!value) return ''
     const numValue = parseFloat(value)
@@ -136,18 +141,16 @@ const MeasurementPage = () => {
   const calculateBorderWidth = (boxWidth: number, boxHeight: number, scale: number): number => {
     const minSize = Math.min(boxWidth, boxHeight)
     const baseWidth = minSize < 20 ? 1 : minSize < 50 ? 1.5 : 2
-    // ズームレベルが高い時は線を細くする
     const scaledWidth = baseWidth / Math.max(1, scale / 2)
     return Math.max(0.5, scaledWidth)
   }
 
   // ズームレベルに応じた要素サイズを計算する関数
   const getScaledElementSize = (baseSize: number, scale: number): number => {
-    // スケールが大きくなるほど要素を小さくする
     return baseSize / Math.max(1, scale / 2)
   }
 
-  // 座標変換関数（ズーム・パン対応）
+  // 座標変換関数
   const screenToCanvas = (screenX: number, screenY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
@@ -158,7 +161,7 @@ const MeasurementPage = () => {
     return { x, y }
   }
 
-  // ズーム処理（最大1000倍に拡張）
+  // ズーム処理
   const handleWheel = useCallback((e: WheelEvent) => {
     if (!canvasRef.current || drawMode) return
     e.preventDefault()
@@ -168,9 +171,8 @@ const MeasurementPage = () => {
     const mouseY = e.clientY - rect.top
     
     const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1
-    const newScale = Math.min(Math.max(viewTransform.scale * scaleFactor, 0.5), 1000) // 最大ズームを1000倍に拡張
+    const newScale = Math.min(Math.max(viewTransform.scale * scaleFactor, 0.5), 1000)
     
-    // マウス位置を中心にズーム
     const scaleChange = newScale - viewTransform.scale
     const newTranslateX = viewTransform.translateX - mouseX * scaleChange / newScale
     const newTranslateY = viewTransform.translateY - mouseY * scaleChange / newScale
@@ -190,6 +192,29 @@ const MeasurementPage = () => {
       return () => canvas.removeEventListener('wheel', handleWheel)
     }
   }, [handleWheel])
+
+  // 動的なフォントサイズ計算（改良版 - 最小値を可変に）
+  const calculateOptimalFontSize = (text: string, boxWidth: number, boxHeight: number, isVertical: boolean): number => {
+    const padding = 4
+    const availableWidth = boxWidth - padding * 2
+    const availableHeight = boxHeight - padding * 2
+    
+    if (isVertical) {
+      const charHeight = availableHeight / text.length
+      const fontSize = Math.min(charHeight * 0.8, availableWidth * 0.9)
+      return Math.max(minFontSize, Math.min(fontSize, 24)) // 最小値を可変に
+    } else {
+      const estimatedCharWidth = 0.6
+      const requiredWidth = text.length * estimatedCharWidth
+      
+      const fontSizeByWidth = availableWidth / requiredWidth
+      const fontSizeByHeight = availableHeight * 0.8
+      
+      const optimalSize = Math.min(fontSizeByWidth, fontSizeByHeight)
+      
+      return Math.max(minFontSize, Math.min(optimalSize, 32)) // 最小値を可変に
+    }
+  }
 
   // ダブルクリックで編集開始
   const handleBoxDoubleClick = (box: Box) => {
@@ -265,18 +290,17 @@ const MeasurementPage = () => {
     setContextMenu({ visible: false, x: 0, y: 0, boxId: null })
   }
 
-  // 桁数変更（値が既に入っていても対応）
+  // 桁数変更
   const changeDecimalPlaces = (boxId: number, decimalPlaces: number) => {
     setBoxes(prev => prev.map(box => {
       if (box.id === boxId) {
-        // 値が既に入っている場合は、新しい桁数でフォーマットし直す
         if (box.value) {
           const numValue = parseFloat(box.value)
           if (!isNaN(numValue)) {
             return { 
               ...box, 
               decimalPlaces,
-              value: box.value // 元の値を保持（表示時にフォーマット）
+              value: box.value
             }
           }
         }
@@ -425,7 +449,6 @@ const MeasurementPage = () => {
       const reader = new FileReader()
       reader.onload = (e) => {
         setDrawingImage(e.target?.result as string)
-        // ビューをリセット
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
       }
       reader.readAsDataURL(file)
@@ -440,15 +463,13 @@ const MeasurementPage = () => {
     }
   }
 
-  // マウスダウン処理（改良版）
+  // マウスダウン処理
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
     
-    // 右クリックの場合は処理しない
     if (e.button === 2) return
     
-    // パンモード
     if (!drawMode) {
       handlePanStart(e)
       return
@@ -472,17 +493,15 @@ const MeasurementPage = () => {
     })
   }
 
-  // マウス移動処理（改良版）
+  // マウス移動処理
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault()
     
-    // パンモード処理
     if (isPanning) {
       handlePanMove(e)
       return
     }
     
-    // ツールチップ位置更新
     if (canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect()
       const x = e.clientX - rect.left
@@ -535,7 +554,7 @@ const MeasurementPage = () => {
     } : null)
   }
 
-  // マウスアップ処理（最小サイズを緩和）
+  // マウスアップ処理
   const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault()
     
@@ -548,7 +567,6 @@ const MeasurementPage = () => {
     
     setIsDrawing(false)
     
-    // 最小サイズを3pxに緩和（以前は5px）
     if (currentBox.width > minBoxSize && currentBox.height > minBoxSize) {
       setBoxes(prev => [...prev, currentBox])
     }
@@ -556,10 +574,9 @@ const MeasurementPage = () => {
     setCurrentBox(null)
   }
 
-  // 測定値自動転記（手動編集されたボックスはスキップ）
+  // 測定値自動転記
   const autoAssignValues = () => {
     const updatedBoxes = boxes.map((box, index) => {
-      // 手動編集されたボックスはスキップ
       if (box.isManuallyEdited) {
         return box
       }
@@ -594,9 +611,14 @@ const MeasurementPage = () => {
         hideContextMenu()
         setEditingBoxId(null)
         
-        // 一時的にビューをリセット
         const tempTransform = viewTransform
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
+        
+        // 一時的に番号と削除ボタンを非表示に
+        const tempShowNumbers = showBoxNumbers
+        const tempShowDelete = showDeleteButtons
+        setShowBoxNumbers(false)
+        setShowDeleteButtons(false)
         
         setTimeout(async () => {
           const canvas = await html2canvas(canvasRef.current!, {
@@ -609,8 +631,10 @@ const MeasurementPage = () => {
           link.href = canvas.toDataURL()
           link.click()
           
-          // ビューを復元
+          // 設定を復元
           setViewTransform(tempTransform)
+          setShowBoxNumbers(tempShowNumbers)
+          setShowDeleteButtons(tempShowDelete)
         }, 100)
       } catch (error) {
         console.error('保存エラー:', error)
@@ -622,35 +646,6 @@ const MeasurementPage = () => {
   // ボックス削除
   const deleteBox = (boxId: number) => {
     setBoxes(prev => prev.filter(box => box.id !== boxId))
-  }
-
-  // 動的なフォントサイズ計算（改良版）
-  const calculateOptimalFontSize = (text: string, boxWidth: number, boxHeight: number, isVertical: boolean): number => {
-    // パディングを考慮
-    const padding = 4
-    const availableWidth = boxWidth - padding * 2
-    const availableHeight = boxHeight - padding * 2
-    
-    if (isVertical) {
-      // 縦書きの場合
-      const charHeight = availableHeight / text.length
-      const fontSize = Math.min(charHeight * 0.8, availableWidth * 0.9)
-      return Math.max(6, Math.min(fontSize, 24)) // 最小6pxに変更
-    } else {
-      // 横書きの場合
-      // テキストの推定幅（フォントサイズ1pxあたり約0.6文字幅）
-      const estimatedCharWidth = 0.6
-      const requiredWidth = text.length * estimatedCharWidth
-      
-      // 幅と高さから最適なフォントサイズを計算
-      const fontSizeByWidth = availableWidth / requiredWidth
-      const fontSizeByHeight = availableHeight * 0.8
-      
-      const optimalSize = Math.min(fontSizeByWidth, fontSizeByHeight)
-      
-      // 最小6px、最大32pxに制限
-      return Math.max(6, Math.min(optimalSize, 32))
-    }
   }
 
   // スタイル定義
@@ -675,16 +670,6 @@ const MeasurementPage = () => {
       padding: '20px',
       textAlign: 'center' as const,
       position: 'relative' as const
-    },
-    logo: {
-      position: 'absolute' as const,
-      right: '950px',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      height: '5rem',
-      width: 'auto',
-      maxWidth: '120px',
-      objectFit: 'contain' as const
     },
     controls: {
       padding: '20px',
@@ -794,7 +779,8 @@ const MeasurementPage = () => {
       fontWeight: 'bold' as const,
       writingMode: 'horizontal-tb' as const,
       zIndex: 10,
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
+      display: showBoxNumbers ? 'block' : 'none' // 表示制御を追加
     }),
     boxValue: (textColor: string) => ({
       fontWeight: 'bold' as const,
@@ -847,7 +833,7 @@ const MeasurementPage = () => {
       width: `${scaledSize * 1.3}px`,
       height: `${scaledSize * 1.3}px`,
       cursor: 'pointer',
-      display: 'flex',
+      display: showDeleteButtons && !drawMode && !editingBoxId ? 'flex' : 'none', // 表示制御を追加
       alignItems: 'center',
       justifyContent: 'center',
       fontSize: `${scaledSize * 0.8}px`,
@@ -948,11 +934,6 @@ const MeasurementPage = () => {
     <div style={styles.container}>
       <div style={styles.mainContainer}>
         <div style={styles.header}>
-          <img
-            src="/logo.png"
-            alt="KYORITSU Logo"
-            style={styles.logo}
-          />
           <h1>📊 図面測定値転記システム (完全版)</h1>
           <p>ダブルクリックで値を編集・右クリックで桁数変更</p>
         </div>
@@ -995,6 +976,22 @@ const MeasurementPage = () => {
             onClick={() => setDrawMode(!drawMode)}
           >
             {drawMode ? '✏️ 描画モード' : '🤚 移動・編集モード'}
+          </button>
+          
+          <button
+            style={styles.actionBtn(showBoxNumbers)}
+            onClick={() => setShowBoxNumbers(!showBoxNumbers)}
+            title="ボックス番号の表示/非表示"
+          >
+            {showBoxNumbers ? '🔢 番号表示' : '🔢 番号非表示'}
+          </button>
+          
+          <button
+            style={styles.actionBtn(showDeleteButtons)}
+            onClick={() => setShowDeleteButtons(!showDeleteButtons)}
+            title="削除ボタンの表示/非表示"
+          >
+            {showDeleteButtons ? '❌ 削除ボタン表示' : '❌ 削除ボタン非表示'}
           </button>
           
           <button
@@ -1068,6 +1065,19 @@ const MeasurementPage = () => {
               max="20"
               value={minBoxSize}
               onChange={(e) => setMinBoxSize(parseInt(e.target.value) || 3)}
+              style={{ width: '50px', padding: '2px 5px', borderRadius: '5px', border: '1px solid #ccc' }}
+            />
+            <span>px</span>
+          </div>
+          
+          <div style={styles.decimalControl}>
+            <span>最小フォント:</span>
+            <input
+              type="number"
+              min="1"
+              max="6"
+              value={minFontSize}
+              onChange={(e) => setMinFontSize(parseInt(e.target.value) || 1)}
               style={{ width: '50px', padding: '2px 5px', borderRadius: '5px', border: '1px solid #ccc' }}
             />
             <span>px</span>
@@ -1184,7 +1194,7 @@ const MeasurementPage = () => {
                         )
                       )}
                       
-                      {!drawMode && !isEditing && (
+                      {!isEditing && (
                         <button
                           style={styles.deleteBtn(textColorMode, scaledDeleteBtnSize)}
                           onClick={(e) => {
@@ -1315,6 +1325,7 @@ const MeasurementPage = () => {
                 <span>手動編集: <strong>{boxes.filter(b => b.isManuallyEdited).length}</strong></span>
                 <span>ズーム: <strong>{Math.round(viewTransform.scale * 100)}%</strong></span>
                 <span>最小サイズ: <strong>{minBoxSize}px</strong></span>
+                <span>最小フォント: <strong>{minFontSize}px</strong></span>
               </div>
               <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
                 💡 <strong>使い方ガイド:</strong>
@@ -1323,7 +1334,8 @@ const MeasurementPage = () => {
                   <li><strong>右クリック</strong>: 小数点桁数を変更</li>
                   <li><strong>移動モード + マウスホイール</strong>: ズーム（最大1000倍）</li>
                   <li><strong>移動モード + ドラッグ</strong>: 画面移動</li>
-                  <li><strong>最小ボックスサイズ</strong>: 調整可能（3〜20px）</li>
+                  <li><strong>最小フォントサイズ</strong>: 1〜6px調整可能</li>
+                  <li><strong>番号/削除ボタン</strong>: 表示/非表示切り替え可能</li>
                   <li><strong>✏️マーク</strong>: 手動編集されたボックス</li>
                 </ul>
               </div>
