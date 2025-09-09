@@ -393,56 +393,86 @@ const MeasurementPage = () => {
             const rowItems = row.map((item: any) => item.str.trim()).filter((s: string) => s.length > 0)
             const rowText = rowItems.join(' ')
             
-            if (isZeissFormat) {
-              // ZEISS形式の新しいパターン（改善版）
-              // rowItemsから直接値を取得する方法
-              if (rowItems.length >= 3) {
-                const name = rowItems[0]
-                
-                // ヘッダー行や不要な行を除外
-                if (name === '名前' || name === '測定値' || name === '設計値' || 
-                    name === '公差(+)' || name === '公差(-)' || name === '誤差') {
-                  continue
-                }
-                
-                // 測定値を探す（通常は2番目の要素）
-                let measuredValue = null
-                let unitFound = 'mm'
-                
-                // 測定値を見つける（数値パターンにマッチするものを探す）
-                for (let j = 1; j < rowItems.length; j++) {
-                  const item = rowItems[j]
-                  // mmを含む場合は単位を除去
-                  const cleanedItem = item.replace(/\s*mm\s*$/, '')
-                  
-                  // 数値パターンにマッチするか確認
-                  if (/^[-]?\d+\.\d+$/.test(cleanedItem)) {
-                    measuredValue = cleanedItem
-                    // 次の要素が単位かチェック
-                    if (j + 1 < rowItems.length && rowItems[j + 1] === 'mm') {
-                      unitFound = 'mm'
-                    }
-                    break
-                  }
-                }
-                
-                if (measuredValue) {
-                  const exists = extractedMeasurements.some(m => 
-                    m.name === name && m.value === measuredValue
-                  )
-                  
-                  if (!exists) {
-                    extractedMeasurements.push({
-                      name: name,
-                      value: measuredValue,
-                      unit: unitFound
-                    })
-                    console.log(`ZEISS形式（改善版）: ${name} = ${measuredValue} ${unitFound}`)
-                  }
-                }
-              }
-              
-            } else {
+  // ZEISS形式のPDF処理部分の修正版
+// page.tsxの1094行目付近の if (isZeissFormat) { ... } ブロックを以下に置き換えてください
+
+if (isZeissFormat) {
+  // ZEISS形式の新しいパターン（改善版）
+  if (rowItems.length >= 2) {
+    // 測定値を探す（数値パターンにマッチするものを探す）
+    let measuredValueIndex = -1
+    let measuredValue = null
+    let unitFound = 'mm'
+    
+    // 数値パターンを持つ要素を探す
+    for (let j = 0; j < rowItems.length; j++) {
+      const item = rowItems[j].replace(/\s*mm\s*$/, '')
+      
+      // 測定値のパターン（小数点を含む数値）
+      if (/^[-]?\d+\.\d{3,4}$/.test(item)) {
+        measuredValue = item
+        measuredValueIndex = j
+        // 次の要素が単位かチェック
+        if (j + 1 < rowItems.length && rowItems[j + 1] === 'mm') {
+          unitFound = 'mm'
+        }
+        break
+      }
+    }
+    
+    // 測定値が見つかった場合、名前を構築
+    if (measuredValue && measuredValueIndex > 0) {
+      // 測定値より前のすべての要素を結合して名前を作成
+      let nameParts = []
+      for (let k = 0; k < measuredValueIndex; k++) {
+        const part = rowItems[k].trim()
+        // ヘッダー行や不要な要素を除外
+        if (part && 
+            part !== '名前' && 
+            part !== '測定値' && 
+            part !== '設計値' && 
+            part !== '公差(+)' && 
+            part !== '公差(-)' && 
+            part !== '誤差' &&
+            part !== '+/-') {
+          nameParts.push(part)
+        }
+      }
+      
+      // 名前を結合（特殊文字の処理）
+      let name = nameParts.join('')
+      
+      // 一般的なZEISS形式のパターンを修正
+      // "X-" "値円1_6H7" -> "X-値円1_6H7"
+      // "平面度" "1" -> "平面度1"
+      if (name.endsWith('-') && nameParts.length > 1) {
+        // ハイフンで終わる場合は次の要素と結合されている可能性が高い
+        name = nameParts.join('')
+      } else if (nameParts.length === 2 && /^[A-Za-z]+-?$/.test(nameParts[0])) {
+        // "X-" や "Y-" のようなパターン
+        name = nameParts.join('')
+      } else if (nameParts.length === 2 && /^\d+$/.test(nameParts[1])) {
+        // "平面度" "1" のようなパターン
+        name = nameParts.join('')
+      }
+      
+      if (name && measuredValue) {
+        const exists = extractedMeasurements.some(m => 
+          m.name === name && m.value === measuredValue
+        )
+        
+        if (!exists) {
+          extractedMeasurements.push({
+            name: name,
+            value: measuredValue,
+            unit: unitFound
+          })
+          console.log(`ZEISS形式（改善版）: ${name} = ${measuredValue} ${unitFound}`)
+        }
+      }
+    }
+  }
+}else {
               // Calypso形式のパターン（既存のまま）
               const calypsoPatterns = [
                 /^(.+?)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+/,
