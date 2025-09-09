@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import html2canvas from 'html2canvas'
 
-// 型定義（改良版）
+// 型定義
 interface Box {
   id: number
   x: number
@@ -38,7 +38,7 @@ interface ViewTransform {
 }
 
 const MeasurementPage = () => {
-  // 既存のState
+  // State管理
   const [boxes, setBoxes] = useState<Box[]>([])
   const [measurements, setMeasurements] = useState<Measurement[]>([])
   const [drawingImage, setDrawingImage] = useState<string | null>(null)
@@ -53,8 +53,6 @@ const MeasurementPage = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
   const [textColorMode, setTextColorMode] = useState<'black' | 'white'>('black')
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
-  
-  // 既存State（続き）
   const [contextMenu, setContextMenu] = useState<ContextMenu>({
     visible: false,
     x: 0,
@@ -72,11 +70,9 @@ const MeasurementPage = () => {
   const [editingBoxId, setEditingBoxId] = useState<number | null>(null)
   const [editingValue, setEditingValue] = useState('')
   const [minBoxSize, setMinBoxSize] = useState(3)
-  
-  // 新規追加State
-  const [minFontSize, setMinFontSize] = useState(2) // 最小フォントサイズ（1〜6px）
-  const [showBoxNumbers, setShowBoxNumbers] = useState(true) // ボックス番号の表示/非表示
-  const [showDeleteButtons, setShowDeleteButtons] = useState(true) // 削除ボタンの表示/非表示
+  const [minFontSize, setMinFontSize] = useState(2)
+  const [showBoxNumbers, setShowBoxNumbers] = useState(true)
+  const [showDeleteButtons, setShowDeleteButtons] = useState(true)
   
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -137,7 +133,7 @@ const MeasurementPage = () => {
     return numValue.toFixed(decimalPlaces)
   }
 
-  // ボックスの線幅を動的に計算する関数
+  // ボックスの線幅を動的に計算
   const calculateBorderWidth = (boxWidth: number, boxHeight: number, scale: number): number => {
     const minSize = Math.min(boxWidth, boxHeight)
     const baseWidth = minSize < 20 ? 1 : minSize < 50 ? 1.5 : 2
@@ -145,7 +141,7 @@ const MeasurementPage = () => {
     return Math.max(0.5, scaledWidth)
   }
 
-  // ズームレベルに応じた要素サイズを計算する関数
+  // ズームレベルに応じた要素サイズを計算
   const getScaledElementSize = (baseSize: number, scale: number): number => {
     return baseSize / Math.max(1, scale / 2)
   }
@@ -193,7 +189,7 @@ const MeasurementPage = () => {
     }
   }, [handleWheel])
 
-  // 動的なフォントサイズ計算（改良版 - 最小値を可変に）
+  // 動的なフォントサイズ計算
   const calculateOptimalFontSize = (text: string, boxWidth: number, boxHeight: number, isVertical: boolean): number => {
     const padding = 4
     const availableWidth = boxWidth - padding * 2
@@ -202,7 +198,7 @@ const MeasurementPage = () => {
     if (isVertical) {
       const charHeight = availableHeight / text.length
       const fontSize = Math.min(charHeight * 0.8, availableWidth * 0.9)
-      return Math.max(minFontSize, Math.min(fontSize, 24)) // 最小値を可変に
+      return Math.max(minFontSize, Math.min(fontSize, 24))
     } else {
       const estimatedCharWidth = 0.6
       const requiredWidth = text.length * estimatedCharWidth
@@ -212,7 +208,7 @@ const MeasurementPage = () => {
       
       const optimalSize = Math.min(fontSizeByWidth, fontSizeByHeight)
       
-      return Math.max(minFontSize, Math.min(optimalSize, 32)) // 最小値を可変に
+      return Math.max(minFontSize, Math.min(optimalSize, 32))
     }
   }
 
@@ -320,11 +316,12 @@ const MeasurementPage = () => {
     setDefaultDecimalPlaces(decimalPlaces)
   }
 
-  // PDFテキスト抽出（フォールバックデータ含む）
+  // 改良版PDFテキスト抽出
   const extractMeasurementsFromPDF = async (file: File) => {
     try {
       setPdfLoadError(null)
       
+      // PDF.jsの読み込み待機
       let retryCount = 0
       while (!(window as any).pdfjsLib && retryCount < 10) {
         await new Promise(resolve => setTimeout(resolve, 300))
@@ -338,7 +335,8 @@ const MeasurementPage = () => {
         const arrayBuffer = await file.arrayBuffer()
         const pdf = await pdfjsLib.getDocument({ 
           data: arrayBuffer,
-          useSystemFonts: true 
+          useSystemFonts: true,
+          standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/'
         }).promise
         
         console.log(`PDFページ数: ${pdf.numPages}`)
@@ -349,52 +347,104 @@ const MeasurementPage = () => {
           const textContent = await page.getTextContent()
           const textItems = textContent.items as any[]
           
-          let measurementRows: { name: string; value: string; }[] = []
-          
-          const rowsByY: { [key: number]: string[] } = {}
-          textItems.forEach((item: any) => {
-            const y = Math.round(item.transform[5])
-            if (!rowsByY[y]) {
-              rowsByY[y] = []
-            }
-            if (item.str.trim()) {
-              rowsByY[y].push(item.str.trim())
-            }
+          // テキストアイテムを位置でソート
+          const sortedItems = textItems.sort((a: any, b: any) => {
+            const yDiff = b.transform[5] - a.transform[5]
+            if (Math.abs(yDiff) > 2) return yDiff
+            return a.transform[4] - b.transform[4]
           })
           
-          Object.values(rowsByY).forEach((row) => {
-            const rowText = row.join(' ')
+          // 行ごとにグループ化
+          const rows: any[] = []
+          let currentRow: any[] = []
+          let lastY = null
+          
+          for (const item of sortedItems) {
+            const y = Math.round(item.transform[5])
             
-            const patterns = [
-              /^(.+?)\s+([-]?\d+\.\d+)\s+mm\s+[-]?\d+/,
-              /^([^\d]+?)\s+([-]?\d+\.\d+)\s+mm/,
+            if (lastY === null || Math.abs(y - lastY) < 3) {
+              currentRow.push(item)
+            } else {
+              if (currentRow.length > 0) {
+                rows.push(currentRow)
+              }
+              currentRow = [item]
+            }
+            lastY = y
+          }
+          if (currentRow.length > 0) {
+            rows.push(currentRow)
+          }
+          
+          // 測定データの抽出
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i]
+            const rowText = row.map((item: any) => item.str).join(' ').trim()
+            
+            // Calypso形式のパターン
+            const calypsoPatterns = [
+              /^(.+?)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+/,
+              /^([A-Za-z_\-]+[\d_]*(?:_[A-Za-z0-9]+)*)\s+([-]?\d+\.\d{4})\s+/,
+              /^(平面度\d*|同心度\d*|真円度[^\s]*|直径[^\s]*)\s+([-]?\d+\.\d{4})\s+/
             ]
             
-            for (const pattern of patterns) {
+            // ZEISS形式のパターン（日本語対応）
+            const zeissPatterns = [
+              /^(平面度\d*|[XY]-値[^\s]+|直径[^\s]+|真円度[^\s]+|同心度\d*|距離[^\s]*|長さ[^\s]*|幅[^\s]*)\s+([-]?\d+\.\d+)\s*mm/,
+              /^([^\s]+(?:円|点|長穴)\d+[^\s]*)\s+([-]?\d+\.\d+)\s*mm/
+            ]
+            
+            let matched = false
+            
+            // Calypso形式のチェック
+            for (const pattern of calypsoPatterns) {
               const match = rowText.match(pattern)
               if (match) {
-                const name = match[1].replace(/[□▼]/g, '').trim()
+                const name = match[1].trim()
                 const value = match[2]
                 
-                const exists = measurementRows.some(m => 
+                // 重複チェック
+                const exists = extractedMeasurements.some(m => 
                   m.name === name && m.value === value
                 )
                 
-                if (!exists && name.length > 0 && !name.match(/^名前$/)) {
-                  measurementRows.push({ name, value })
+                if (!exists && !name.includes('設計値') && !name.includes('公差')) {
+                  extractedMeasurements.push({
+                    name: name,
+                    value: value,
+                    unit: 'mm'
+                  })
+                  matched = true
+                  break
                 }
-                break
               }
             }
-          })
-          
-          measurementRows.forEach(({ name, value }) => {
-            extractedMeasurements.push({
-              name: name,
-              value: value,
-              unit: 'mm'
-            })
-          })
+            
+            // ZEISS形式のチェック
+            if (!matched) {
+              for (const pattern of zeissPatterns) {
+                const match = rowText.match(pattern)
+                if (match) {
+                  const name = match[1].trim()
+                  const value = match[2]
+                  
+                  // 重複チェック
+                  const exists = extractedMeasurements.some(m => 
+                    m.name === name && m.value === value
+                  )
+                  
+                  if (!exists) {
+                    extractedMeasurements.push({
+                      name: name,
+                      value: value,
+                      unit: 'mm'
+                    })
+                    break
+                  }
+                }
+              }
+            }
+          }
         }
         
         console.log('抽出された測定値:', extractedMeasurements)
@@ -416,6 +466,7 @@ const MeasurementPage = () => {
       
     } catch (error) {
       console.error('PDF解析エラー:', error)
+      setPdfLoadError('PDF解析中にエラーが発生しました')
       loadFallbackData()
     }
   }
@@ -614,7 +665,6 @@ const MeasurementPage = () => {
         const tempTransform = viewTransform
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
         
-        // 一時的に番号と削除ボタンを非表示に
         const tempShowNumbers = showBoxNumbers
         const tempShowDelete = showDeleteButtons
         setShowBoxNumbers(false)
@@ -631,7 +681,6 @@ const MeasurementPage = () => {
           link.href = canvas.toDataURL()
           link.click()
           
-          // 設定を復元
           setViewTransform(tempTransform)
           setShowBoxNumbers(tempShowNumbers)
           setShowDeleteButtons(tempShowDelete)
@@ -780,7 +829,7 @@ const MeasurementPage = () => {
       writingMode: 'horizontal-tb' as const,
       zIndex: 10,
       fontFamily: '"Noto Sans JP", sans-serif',
-      display: showBoxNumbers ? 'block' : 'none' // 表示制御を追加
+      display: showBoxNumbers ? 'block' : 'none'
     }),
     boxValue: (textColor: string) => ({
       fontWeight: 'bold' as const,
@@ -833,7 +882,7 @@ const MeasurementPage = () => {
       width: `${scaledSize * 1.3}px`,
       height: `${scaledSize * 1.3}px`,
       cursor: 'pointer',
-      display: showDeleteButtons && !drawMode && !editingBoxId ? 'flex' : 'none', // 表示制御を追加
+      display: showDeleteButtons && !drawMode && !editingBoxId ? 'flex' : 'none',
       alignItems: 'center',
       justifyContent: 'center',
       fontSize: `${scaledSize * 0.8}px`,
@@ -951,7 +1000,7 @@ const MeasurementPage = () => {
               style={styles.uploadBtn}
               onClick={() => fileInputRef.current?.click()}
             >
-              📊 図面をアップロード
+              📐 図面をアップロード
             </button>
           </label>
           
@@ -1006,7 +1055,7 @@ const MeasurementPage = () => {
             onClick={autoAssignValues}
             disabled={!pdfLoaded || boxes.length === 0}
           >
-            🔄 測定値を自動転記
+            📄 測定値を自動転記
           </button>
           
           <button
@@ -1116,7 +1165,6 @@ const MeasurementPage = () => {
                     : 14
                   const isEditing = editingBoxId === box.id
                   
-                  // 動的な線幅とUI要素サイズの計算
                   const borderWidth = calculateBorderWidth(box.width, box.height, viewTransform.scale)
                   const scaledNumberSize = getScaledElementSize(14, viewTransform.scale)
                   const scaledDeleteBtnSize = getScaledElementSize(16, viewTransform.scale)
@@ -1290,7 +1338,7 @@ const MeasurementPage = () => {
               {measurements.length === 0 ? (
                 <p style={{ color: '#999' }}>
                   PDFをアップロードすると測定値が表示されます<br/>
-                  <small>※PDF解析に失敗した場合は手動データが表示されます</small>
+                  <small>※Calypso/ZEISS両形式対応</small>
                 </p>
               ) : (
                 measurements.map((m, index) => {
@@ -1385,7 +1433,7 @@ const MeasurementPage = () => {
                       → {formatValue(currentBox.value, places)}
                     </span>
                   )}
-                  {isCurrentSetting && <span style={{ color: '#667eea' }}>✓</span>}
+                  {isCurrentSetting && <span style={{ color: '#667eea' }}>✔</span>}
                 </span>
               </div>
             )
