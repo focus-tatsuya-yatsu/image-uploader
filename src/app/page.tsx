@@ -316,7 +316,7 @@ const MeasurementPage = () => {
     setDefaultDecimalPlaces(decimalPlaces)
   }
 
-  // 改良版PDFテキスト抽出
+  // 改良版PDFテキスト抽出（ZEISS形式対応修正版）
   const extractMeasurementsFromPDF = async (file: File) => {
     try {
       setPdfLoadError(null)
@@ -357,7 +357,7 @@ const MeasurementPage = () => {
           // 行ごとにグループ化
           const rows: any[] = []
           let currentRow: any[] = []
-          let lastY = null
+          let lastY: number | null = null
           
           for (const item of sortedItems) {
             const y = Math.round(item.transform[5])
@@ -376,69 +376,97 @@ const MeasurementPage = () => {
             rows.push(currentRow)
           }
           
-          // 測定データの抽出
+          // ZEISS形式かどうかを判定
+          let isZeissFormat = false
+          for (const row of rows) {
+            const rowText = row.map((item: any) => item.str).join(' ').trim()
+            if (rowText.includes('ZEISS CALYPSO') || (rowText.includes('測定値') && rowText.includes('設計値'))) {
+              isZeissFormat = true
+              console.log('ZEISS形式を検出しました')
+              break
+            }
+          }
+          
+          // 測定データの抽出（修正版）
           for (let i = 0; i < rows.length; i++) {
             const row = rows[i]
-            const rowText = row.map((item: any) => item.str).join(' ').trim()
+            const rowItems = row.map((item: any) => item.str.trim()).filter((s: string) => s.length > 0)
+            const rowText = rowItems.join(' ')
             
-            // Calypso形式のパターン
-            const calypsoPatterns = [
-              /^(.+?)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+/,
-              /^([A-Za-z_\-]+[\d_]*(?:_[A-Za-z0-9]+)*)\s+([-]?\d+\.\d{4})\s+/,
-              /^(平面度\d*|同心度\d*|真円度[^\s]*|直径[^\s]*)\s+([-]?\d+\.\d{4})\s+/
-            ]
-            
-            // ZEISS形式のパターン（日本語対応）
-            const zeissPatterns = [
-              /^(平面度\d*|[XY]-値[^\s]+|直径[^\s]+|真円度[^\s]+|同心度\d*|距離[^\s]*|長さ[^\s]*|幅[^\s]*)\s+([-]?\d+\.\d+)\s*mm/,
-              /^([^\s]+(?:円|点|長穴)\d+[^\s]*)\s+([-]?\d+\.\d+)\s*mm/
-            ]
-            
-            let matched = false
-            
-            // Calypso形式のチェック
-            for (const pattern of calypsoPatterns) {
-              const match = rowText.match(pattern)
-              if (match) {
-                const name = match[1].trim()
-                const value = match[2]
+            if (isZeissFormat) {
+              // ZEISS形式の新しいパターン（改善版）
+              // rowItemsから直接値を取得する方法
+              if (rowItems.length >= 3) {
+                const name = rowItems[0]
                 
-                // 重複チェック
-                const exists = extractedMeasurements.some(m => 
-                  m.name === name && m.value === value
-                )
-                
-                if (!exists && !name.includes('設計値') && !name.includes('公差')) {
-                  extractedMeasurements.push({
-                    name: name,
-                    value: value,
-                    unit: 'mm'
-                  })
-                  matched = true
-                  break
+                // ヘッダー行や不要な行を除外
+                if (name === '名前' || name === '測定値' || name === '設計値' || 
+                    name === '公差(+)' || name === '公差(-)' || name === '誤差') {
+                  continue
                 }
-              }
-            }
-            
-            // ZEISS形式のチェック
-            if (!matched) {
-              for (const pattern of zeissPatterns) {
-                const match = rowText.match(pattern)
-                if (match) {
-                  const name = match[1].trim()
-                  const value = match[2]
+                
+                // 測定値を探す（通常は2番目の要素）
+                let measuredValue = null
+                let unitFound = 'mm'
+                
+                // 測定値を見つける（数値パターンにマッチするものを探す）
+                for (let j = 1; j < rowItems.length; j++) {
+                  const item = rowItems[j]
+                  // mmを含む場合は単位を除去
+                  const cleanedItem = item.replace(/\s*mm\s*$/, '')
                   
-                  // 重複チェック
+                  // 数値パターンにマッチするか確認
+                  if (/^[-]?\d+\.\d+$/.test(cleanedItem)) {
+                    measuredValue = cleanedItem
+                    // 次の要素が単位かチェック
+                    if (j + 1 < rowItems.length && rowItems[j + 1] === 'mm') {
+                      unitFound = 'mm'
+                    }
+                    break
+                  }
+                }
+                
+                if (measuredValue) {
                   const exists = extractedMeasurements.some(m => 
-                    m.name === name && m.value === value
+                    m.name === name && m.value === measuredValue
                   )
                   
                   if (!exists) {
                     extractedMeasurements.push({
                       name: name,
+                      value: measuredValue,
+                      unit: unitFound
+                    })
+                    console.log(`ZEISS形式（改善版）: ${name} = ${measuredValue} ${unitFound}`)
+                  }
+                }
+              }
+              
+            } else {
+              // Calypso形式のパターン（既存のまま）
+              const calypsoPatterns = [
+                /^(.+?)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+/,
+                /^([A-Za-z_\-]+[\d_]*(?:_[A-Za-z0-9]+)*)\s+([-]?\d+\.\d{4})\s+/,
+                /^(平面度\d*|同心度\d*|真円度[^\s]*|直径[^\s]*)\s+([-]?\d+\.\d{4})\s+/
+              ]
+              
+              for (const pattern of calypsoPatterns) {
+                const match = rowText.match(pattern)
+                if (match) {
+                  const name = match[1].trim()
+                  const value = match[2]
+                  
+                  const exists = extractedMeasurements.some(m => 
+                    m.name === name && m.value === value
+                  )
+                  
+                  if (!exists && !name.includes('設計値') && !name.includes('公差')) {
+                    extractedMeasurements.push({
+                      name: name,
                       value: value,
                       unit: 'mm'
                     })
+                    console.log(`Calypso形式: ${name} = ${value} mm`)
                     break
                   }
                 }
@@ -471,7 +499,7 @@ const MeasurementPage = () => {
     }
   }
 
-  // フォールバックデータ
+  // フォールバックデータ（ZEISS形式のサンプルデータに更新）
   const loadFallbackData = () => {
     setPdfLoadError('PDFの自動解析に失敗したため、手動データを使用します。')
     
@@ -514,8 +542,13 @@ const MeasurementPage = () => {
     }
   }
 
-  // マウスダウン処理
+  // マウスダウン処理（修正版）
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!e || typeof e.preventDefault !== 'function') {
+      console.warn('Invalid event object')
+      return
+    }
+    
     e.preventDefault()
     e.stopPropagation()
     
@@ -546,6 +579,10 @@ const MeasurementPage = () => {
 
   // マウス移動処理
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!e || typeof e.preventDefault !== 'function') {
+      return
+    }
+    
     e.preventDefault()
     
     if (isPanning) {
@@ -605,9 +642,11 @@ const MeasurementPage = () => {
     } : null)
   }
 
-  // マウスアップ処理
-  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault()
+  // マウスアップ処理（修正版）
+  const handleMouseUp = (e?: React.MouseEvent<HTMLDivElement>) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault()
+    }
     
     if (isPanning) {
       handlePanEnd()
@@ -983,8 +1022,8 @@ const MeasurementPage = () => {
     <div style={styles.container}>
       <div style={styles.mainContainer}>
         <div style={styles.header}>
-          <h1>📊 図面測定値転記システム (完全版)</h1>
-          <p>ダブルクリックで値を編集・右クリックで桁数変更</p>
+          <h1>📊 図面測定値転記システム (ZEISS対応版)</h1>
+          <p>CalypsoとZEISS両形式のPDFに対応</p>
         </div>
         
         <div style={styles.controls}>
@@ -1000,7 +1039,7 @@ const MeasurementPage = () => {
               style={styles.uploadBtn}
               onClick={() => fileInputRef.current?.click()}
             >
-              📐 図面をアップロード
+              🖼 図面をアップロード
             </button>
           </label>
           
@@ -1055,7 +1094,7 @@ const MeasurementPage = () => {
             onClick={autoAssignValues}
             disabled={!pdfLoaded || boxes.length === 0}
           >
-            📄 測定値を自動転記
+            🔄 測定値を自動転記
           </button>
           
           <button
@@ -1135,14 +1174,14 @@ const MeasurementPage = () => {
         
         <div style={styles.mainContent}>
           <div style={styles.panel}>
-            <h3>📐 図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
+            <h3>🖼 図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
             <div
               ref={canvasRef}
               style={styles.canvasContainer}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              onMouseLeave={() => { handleMouseUp({} as any); handlePanEnd() }}
+              onMouseLeave={() => handleMouseUp()}
               onDragStart={(e) => e.preventDefault()}
             >
               <div style={styles.transformContainer}>
@@ -1382,8 +1421,7 @@ const MeasurementPage = () => {
                   <li><strong>右クリック</strong>: 小数点桁数を変更</li>
                   <li><strong>移動モード + マウスホイール</strong>: ズーム（最大1000倍）</li>
                   <li><strong>移動モード + ドラッグ</strong>: 画面移動</li>
-                  <li><strong>最小フォントサイズ</strong>: 1〜6px調整可能</li>
-                  <li><strong>番号/削除ボタン</strong>: 表示/非表示切り替え可能</li>
+                  <li><strong>Calypso/ZEISS形式</strong>: 両方のPDF形式に対応</li>
                   <li><strong>✏️マーク</strong>: 手動編集されたボックス</li>
                 </ul>
               </div>
@@ -1403,7 +1441,7 @@ const MeasurementPage = () => {
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ padding: '8px 16px', fontWeight: 'bold', borderBottom: '1px solid #e0e0e0', background: '#f5f5f5' }}>
-            📏 ボックス設定
+            🔢 ボックス設定
           </div>
           <div style={{ padding: '8px 16px', fontSize: '13px', color: '#666', borderBottom: '1px solid #e0e0e0' }}>
             小数点桁数を選択:
