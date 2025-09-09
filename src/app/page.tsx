@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import html2canvas from 'html2canvas'
+import UTIF from 'utif'
 
 // 型定義
 interface Box {
@@ -427,12 +428,12 @@ if (isZeissFormat) {
       for (let k = 0; k < measuredValueIndex; k++) {
         const part = rowItems[k].trim()
         // ヘッダー行や不要な要素を除外
-        if (part && 
-            part !== '名前' && 
-            part !== '測定値' && 
-            part !== '設計値' && 
-            part !== '公差(+)' && 
-            part !== '公差(-)' && 
+        if (part &&
+            part !== '名前' &&
+            part !== '測定値' &&
+            part !== '設計値' &&
+            part !== '公差(+)' &&
+            part !== '公差(-)' &&
             part !== '誤差' &&
             part !== '+/-') {
           nameParts.push(part)
@@ -483,7 +484,10 @@ if (isZeissFormat) {
               for (const pattern of calypsoPatterns) {
                 const match = rowText.match(pattern)
                 if (match) {
-                  const name = match[1].trim()
+                  let name = match[1].trim()
+                  .replace(/\s+/g, '')  // 全スペース削除
+                  .replace(/([A-Z])-([A-Z])/g, '$1-$2')
+                  .replace(/([^_])_([^_])/g, '$1_$2')
                   const value = match[2]
                   
                   const exists = extractedMeasurements.some(m => 
@@ -552,15 +556,78 @@ if (isZeissFormat) {
   }
 
   // 図面アップロード処理
-  const handleDrawingUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDrawingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file && file.type.startsWith('image/')) {
+    if (!file) return
+  
+    // TIFFファイルの処理
+    if (file.type === 'image/tiff' || file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff')) {
+      try {
+        // TIFFファイルをArrayBufferとして読み込み
+        const arrayBuffer = await file.arrayBuffer()
+        
+        // UTIFでデコード
+        const ifds = UTIF.decode(arrayBuffer)
+        
+        if (ifds.length === 0) {
+          alert('TIFFファイルの読み込みに失敗しました')
+          return
+        }
+        
+        // 最初のページをデコード
+        const firstPage = ifds[0]
+        UTIF.decodeImage(arrayBuffer, firstPage)
+        
+        // RGBAデータを取得
+        const rgba = UTIF.toRGBA8(firstPage)
+        
+        // Canvasに描画
+        const canvas = document.createElement('canvas')
+        canvas.width = firstPage.width
+        canvas.height = firstPage.height
+        
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          alert('Canvas作成に失敗しました')
+          return
+        }
+        
+        // ImageDataを作成
+        const imageData = new ImageData(
+          new Uint8ClampedArray(rgba.buffer),
+          firstPage.width,
+          firstPage.height
+        )
+        
+        // Canvasに描画
+        ctx.putImageData(imageData, 0, 0)
+        
+        // CanvasをData URLに変換
+        const dataUrl = canvas.toDataURL('image/png')
+        
+        // 画像として設定
+        setDrawingImage(dataUrl)
+        setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
+        
+        console.log(`TIFF画像を変換しました: ${firstPage.width}x${firstPage.height}`)
+        
+      } catch (error) {
+        console.error('TIFF処理エラー:', error)
+        alert('TIFFファイルの処理中にエラーが発生しました')
+      }
+      
+    } 
+    // 通常の画像ファイルの処理（JPEG、PNG等）
+    else if (file.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onload = (e) => {
         setDrawingImage(e.target?.result as string)
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
       }
       reader.readAsDataURL(file)
+    } 
+    else {
+      alert('対応していないファイル形式です。JPEG、PNG、TIFFファイルを選択してください。')
     }
   }
 
@@ -1060,7 +1127,7 @@ if (isZeissFormat) {
           <label>
             <input
               type="file"
-              accept="image/*"
+              accept="image/*,.tif,.tiff"
               onChange={handleDrawingUpload}
               style={{ display: 'none' }}
               ref={fileInputRef}
@@ -1069,7 +1136,7 @@ if (isZeissFormat) {
               style={styles.uploadBtn}
               onClick={() => fileInputRef.current?.click()}
             >
-              🖼 図面をアップロード
+              📐 図面をアップロード
             </button>
           </label>
           
@@ -1204,7 +1271,7 @@ if (isZeissFormat) {
         
         <div style={styles.mainContent}>
           <div style={styles.panel}>
-            <h3>🖼 図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
+            <h3>図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
             <div
               ref={canvasRef}
               style={styles.canvasContainer}
