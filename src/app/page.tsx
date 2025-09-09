@@ -423,7 +423,7 @@ if (isZeissFormat) {
     // 測定値が見つかった場合、名前を構築
     if (measuredValue && measuredValueIndex > 0) {
       // 測定値より前のすべての要素を結合して名前を作成
-      let nameParts = []
+      let nameParts: string[]= []
       for (let k = 0; k < measuredValueIndex; k++) {
         const part = rowItems[k].trim()
         // ヘッダー行や不要な要素を除外
