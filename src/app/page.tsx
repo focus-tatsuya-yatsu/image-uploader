@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import UTIF from 'utif'
+
 
 // 型定義
 interface Box {
@@ -75,6 +77,9 @@ const MeasurementPage = () => {
   const [minFontSize, setMinFontSize] = useState(2)
   const [showBoxNumbers, setShowBoxNumbers] = useState(true)
   const [showDeleteButtons, setShowDeleteButtons] = useState(true)
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+const [saveFileName, setSaveFileName] = useState('')
+const [isSaving, setIsSaving] = useState(false)
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -874,40 +879,14 @@ const MeasurementPage = () => {
 
   // 結果を保存
   const exportResult = async () => {
-    if (canvasRef.current) {
-      try {
-        setHoveredBox(null)
-        hideContextMenu()
-        setEditingBoxId(null)
-
-        const tempTransform = viewTransform
-        setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
-
-        const tempShowNumbers = showBoxNumbers
-        const tempShowDelete = showDeleteButtons
-        setShowBoxNumbers(false)
-        setShowDeleteButtons(false)
-
-        setTimeout(async () => {
-          const canvas = await html2canvas(canvasRef.current!, {
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: 'white',
-          })
-          const link = document.createElement('a')
-          link.download = `measurement_result_${new Date().getTime()}.png`
-          link.href = canvas.toDataURL()
-          link.click()
-
-          setViewTransform(tempTransform)
-          setShowBoxNumbers(tempShowNumbers)
-          setShowDeleteButtons(tempShowDelete)
-        }, 100)
-      } catch (error) {
-        console.error('保存エラー:', error)
-        alert('画像の保存に失敗しました。')
-      }
-    }
+    // 保存ダイアログを表示
+    setShowSaveDialog(true)
+    
+    // デフォルトファイル名を設定
+    const now = new Date()
+    const dateStr = now.toISOString().slice(0, 10)
+    const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
+    setSaveFileName(`測定結果_${dateStr}_${timeStr}`)
   }
 
   // ボックス削除
@@ -1233,6 +1212,340 @@ const MeasurementPage = () => {
     document.addEventListener('click', handleClick)
     return () => document.removeEventListener('click', handleClick)
   }, [])
+
+  const SaveDialog = () => {
+    if (!showSaveDialog) return null
+  
+    // デフォルトファイル名を生成
+    const getDefaultFileName = () => {
+      const now = new Date()
+      const dateStr = now.toISOString().slice(0, 10)
+      const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
+      return `測定結果_${dateStr}_${timeStr}`
+    }
+  
+    // 保存実行処理
+    const performSave = async () => {
+      setIsSaving(true)
+      
+      const exportCanvas = document.createElement('canvas')
+      const ctx = exportCanvas.getContext('2d')
+      
+      if (!ctx || !canvasRef.current) {
+        setIsSaving(false)
+        return
+      }
+      
+      try {
+        // UIを一時的に非表示
+        setHoveredBox(null)
+        hideContextMenu()
+        setEditingBoxId(null)
+        setShowBoxNumbers(false)
+        setShowDeleteButtons(false)
+        
+        // 高解像度設定
+        const scale = 3
+        const rect = canvasRef.current.getBoundingClientRect()
+        exportCanvas.width = rect.width * scale
+        exportCanvas.height = rect.height * scale
+        ctx.scale(scale, scale)
+        
+        // 背景を白に
+        ctx.fillStyle = 'white'
+        ctx.fillRect(0, 0, rect.width, rect.height)
+        
+        // 背景画像を描画
+        if (drawingImage) {
+          const img = new Image()
+          img.src = drawingImage
+          await new Promise(resolve => {
+            img.onload = resolve
+          })
+          ctx.drawImage(img, 0, 0, rect.width, rect.height)
+        }
+        
+        // ボックスとテキストを手動で描画
+        boxes.forEach(box => {
+          // ボックスの枠を描画
+          ctx.strokeStyle = box.isOutOfTolerance ? '#ff0000' : '#ff6b6b'
+          ctx.lineWidth = calculateBorderWidth(box.width, box.height, 1)
+          ctx.strokeRect(box.x, box.y, box.width, box.height)
+          
+          // 背景色
+          ctx.fillStyle = box.isOutOfTolerance 
+            ? 'rgba(255, 0, 0, 0.1)' 
+            : 'rgba(255, 107, 107, 0.1)'
+          ctx.fillRect(box.x, box.y, box.width, box.height)
+          
+          // テキストを描画
+          if (box.value) {
+            const formattedValue = formatValue(box.value, box.decimalPlaces)
+            const isVertical = box.height > box.width * 1.5
+            
+            const fontSize = calculateOptimalFontSize(
+              formattedValue, 
+              box.width, 
+              box.height, 
+              isVertical
+            )
+            ctx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`
+            ctx.fillStyle = textColorMode === 'white' ? '#ffffff' : '#333333'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            
+            if (isVertical) {
+              // 縦書き処理
+              ctx.save()
+              ctx.translate(box.x + box.width / 2, box.y + box.height / 2)
+              
+              // 文字を一つずつ縦に配置
+              const chars = formattedValue.split('')
+              const charHeight = box.height / chars.length
+              chars.forEach((char, i) => {
+                const y = -box.height / 2 + charHeight * (i + 0.5)
+                ctx.fillText(char, 0, y)
+              })
+              
+              ctx.restore()
+            } else {
+              // 横書き
+              ctx.fillText(
+                formattedValue, 
+                box.x + box.width / 2, 
+                box.y + box.height / 2
+              )
+            }
+          }
+        })
+        
+        // PDFを生成
+        const pdf = new jsPDF('landscape', 'mm', 'a4')
+        const imgData = exportCanvas.toDataURL('image/png')
+        pdf.addImage(imgData, 'PNG', 0, 0, 297, 210)
+        
+        // ファイル名を決定
+        const finalFileName = saveFileName || getDefaultFileName()
+        
+        // File System Access APIをサポートしているか確認
+        if ('showSaveFilePicker' in window) {
+          try {
+            // ネイティブの保存ダイアログを表示
+            const handle = await (window as any).showSaveFilePicker({
+              suggestedName: `${finalFileName}.pdf`,
+              types: [{
+                description: 'PDFファイル',
+                accept: { 'application/pdf': ['.pdf'] }
+              }],
+              startIn: 'downloads'
+            })
+            
+            const writable = await handle.createWritable()
+            const pdfBlob = pdf.output('blob')
+            await writable.write(pdfBlob)
+            await writable.close()
+            
+            // 成功メッセージ
+            alert('✅ PDFを保存しました！')
+          } catch (err: any) {
+            // ユーザーがキャンセルした場合
+            if (err.name === 'AbortError') {
+              console.log('保存がキャンセルされました')
+            } else {
+              console.error('保存エラー:', err)
+              // エラー時はフォールバック
+              pdf.save(`${finalFileName}.pdf`)
+              alert('⚠️ ネイティブ保存に失敗したため、通常のダウンロードで保存しました。')
+            }
+          }
+        } else {
+          // File System Access API非対応のブラウザ
+          pdf.save(`${finalFileName}.pdf`)
+          alert('📥 PDFをダウンロードフォルダに保存しました！')
+        }
+        
+        // UIを再表示
+        setShowBoxNumbers(true)
+        setShowDeleteButtons(true)
+        
+        // ダイアログを閉じる
+        setShowSaveDialog(false)
+        setSaveFileName('')
+        
+      } catch (error) {
+        console.error('PDF保存エラー:', error)
+        alert('❌ PDFの保存に失敗しました。')
+      } finally {
+        setIsSaving(false)
+      }
+    }
+  
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000,
+        backdropFilter: 'blur(5px)'
+      }}>
+        <div style={{
+          background: 'white',
+          borderRadius: '15px',
+          padding: '30px',
+          width: '500px',
+          maxWidth: '90%',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          fontFamily: '"Noto Sans JP", sans-serif'
+        }}>
+          <h2 style={{ 
+            marginBottom: '25px',
+            color: '#333',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            💾 PDFとして保存
+          </h2>
+          
+          <div style={{ marginBottom: '25px' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '10px',
+              color: '#555',
+              fontWeight: '500'
+            }}>
+              ファイル名:
+            </label>
+            <input
+              type="text"
+              value={saveFileName}
+              onChange={(e) => setSaveFileName(e.target.value)}
+              placeholder={getDefaultFileName()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !isSaving) {
+                  performSave()
+                } else if (e.key === 'Escape') {
+                  setShowSaveDialog(false)
+                  setSaveFileName('')
+                }
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '8px',
+                fontSize: '15px',
+                fontFamily: '"Noto Sans JP", sans-serif',
+                transition: 'border-color 0.2s',
+                outline: 'none'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = '#667eea'
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = '#e0e0e0'
+              }}
+              autoFocus
+              disabled={isSaving}
+            />
+            <small style={{ 
+              color: '#888', 
+              fontSize: '12px',
+              marginTop: '5px',
+              display: 'block'
+            }}>
+              ※ .pdf 拡張子は自動的に追加されます
+            </small>
+          </div>
+  
+          {'showSaveFilePicker' in window && (
+            <div style={{
+              background: '#f0f8ff',
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '20px',
+              fontSize: '13px',
+              color: '#555'
+            }}>
+              💡 <strong>ヒント:</strong> 保存ボタンを押すと、保存場所を選択できます
+            </div>
+          )}
+          
+          <div style={{ 
+            display: 'flex', 
+            gap: '12px', 
+            justifyContent: 'flex-end' 
+          }}>
+            <button
+              onClick={() => {
+                setShowSaveDialog(false)
+                setSaveFileName('')
+              }}
+              disabled={isSaving}
+              style={{
+                padding: '10px 24px',
+                border: '2px solid #e0e0e0',
+                borderRadius: '8px',
+                background: 'white',
+                color: '#666',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                fontWeight: '500',
+                fontSize: '14px',
+                fontFamily: '"Noto Sans JP", sans-serif',
+                transition: 'all 0.2s',
+                opacity: isSaving ? 0.5 : 1
+              }}
+              onMouseEnter={(e) => {
+                if (!isSaving) {
+                  e.currentTarget.style.background = '#f5f5f5'
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'white'
+              }}
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={performSave}
+              disabled={isSaving}
+              style={{
+                padding: '10px 32px',
+                background: isSaving ? '#999' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: isSaving ? 'not-allowed' : 'pointer',
+                fontWeight: '600',
+                fontSize: '14px',
+                fontFamily: '"Noto Sans JP", sans-serif',
+                transition: 'all 0.2s',
+                boxShadow: isSaving ? 'none' : '0 4px 15px rgba(102, 126, 234, 0.4)'
+              }}
+              onMouseEnter={(e) => {
+                if (!isSaving) {
+                  e.currentTarget.style.transform = 'translateY(-1px)'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.5)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)'
+              }}
+            >
+              {isSaving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={styles.container}>
@@ -1780,6 +2093,7 @@ const MeasurementPage = () => {
           })}
         </div>
       )}
+      <SaveDialog />
     </div>
   )
 }
