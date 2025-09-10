@@ -14,9 +14,12 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@types/jspdf": "^2.0.0",
     "file-type": "^18.5.0",
     "framer-motion": "^10.16.0",
+    "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.2",
     "next": "14.0.0",
     "pdfjs-dist": "^5.4.54",
     "react": "^18",
