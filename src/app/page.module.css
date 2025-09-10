@@ -52,7 +52,8 @@
 }
 
 @keyframes float1 {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -64,7 +65,8 @@
 }
 
 @keyframes float2 {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
   }
   33% {
@@ -76,7 +78,8 @@
 }
 
 @keyframes float3 {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(-50%, -50%) scale(1);
   }
   50% {
@@ -281,7 +284,8 @@
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px);
   }
   50% {
@@ -353,7 +357,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     opacity: 1;
   }
@@ -542,48 +547,48 @@
   .title {
     font-size: 1.6rem;
   }
-  
+
   .subtitle {
     font-size: 0.85rem;
   }
-  
+
   .header {
     padding: 12px 15px 8px;
   }
-  
+
   .main {
     padding: 12px 15px;
   }
-  
+
   .singleImageLayout,
   .doubleImageLayout {
     grid-template-columns: 1fr;
     padding-top: 45px;
   }
-  
+
   .uploadContainer.secondUpload {
     max-height: 300px;
   }
-  
+
   .imageCard {
     max-height: calc(50vh - 80px);
   }
-  
+
   .resetButton {
     padding: 6px 14px;
     font-size: 0.8rem;
   }
-  
+
   .uploadTitle {
     font-size: 1.2rem;
   }
-  
+
   .iconWrapper {
     width: 60px;
     height: 60px;
     margin-bottom: 15px;
   }
-  
+
   .uploadIcon {
     width: 40px;
     height: 40px;

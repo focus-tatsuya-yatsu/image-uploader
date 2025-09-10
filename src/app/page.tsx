@@ -59,12 +59,12 @@ const MeasurementPage = () => {
     visible: false,
     x: 0,
     y: 0,
-    boxId: null
+    boxId: null,
   })
   const [viewTransform, setViewTransform] = useState<ViewTransform>({
     scale: 1,
     translateX: 0,
-    translateY: 0
+    translateY: 0,
   })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
@@ -75,7 +75,7 @@ const MeasurementPage = () => {
   const [minFontSize, setMinFontSize] = useState(2)
   const [showBoxNumbers, setShowBoxNumbers] = useState(true)
   const [showDeleteButtons, setShowDeleteButtons] = useState(true)
-  
+
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
@@ -89,22 +89,22 @@ const MeasurementPage = () => {
           const script = document.createElement('script')
           script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
           script.async = true
-          
+
           script.onload = () => {
             if ((window as any).pdfjsLib) {
-              (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 
+              ;(window as any).pdfjsLib.GlobalWorkerOptions.workerSrc =
                 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
               console.log('PDF.js loaded successfully')
             }
           }
-          
+
           script.onerror = () => {
             console.error('Failed to load PDF.js')
             setPdfLoadError('PDF.jsのロードに失敗しました')
           }
-          
+
           document.body.appendChild(script)
-          
+
           return () => {
             if (document.body.contains(script)) {
               document.body.removeChild(script)
@@ -114,7 +114,7 @@ const MeasurementPage = () => {
           console.error('Error loading PDF.js:', error)
         }
       }
-      
+
       loadPdfJs()
     }
   }, [])
@@ -138,9 +138,26 @@ const MeasurementPage = () => {
   // ボックスの線幅を動的に計算
   const calculateBorderWidth = (boxWidth: number, boxHeight: number, scale: number): number => {
     const minSize = Math.min(boxWidth, boxHeight)
-    const baseWidth = minSize < 20 ? 1 : minSize < 50 ? 1.5 : 2
-    const scaledWidth = baseWidth / Math.max(1, scale / 2)
-    return Math.max(0.5, scaledWidth)
+
+    // サイズに応じた基本線幅をより細かく調整
+  let baseWidth: number
+  if (minSize < 10) {
+    baseWidth = 0  // 非常に小さいボックスは0.5px
+  } else if (minSize < 20) {
+    baseWidth = 0.8
+  } else if (minSize < 30) {
+    baseWidth = 1
+  } else if (minSize < 50) {
+    baseWidth = 1.5
+  } else {
+    baseWidth = 2
+  }
+  
+  // ズームレベルによる調整（ズームアウト時は線を太く）
+  const scaledWidth = scale < 1 ? baseWidth / scale : baseWidth / Math.max(1, scale / 2)
+  
+  // 最小値0.3px、最大値3px
+  return Math.max(0, Math.min(3, scaledWidth))
   }
 
   // ズームレベルに応じた要素サイズを計算
@@ -152,35 +169,38 @@ const MeasurementPage = () => {
   const screenToCanvas = (screenX: number, screenY: number) => {
     const rect = canvasRef.current?.getBoundingClientRect()
     if (!rect) return { x: 0, y: 0 }
-    
+
     const x = (screenX - rect.left - viewTransform.translateX) / viewTransform.scale
     const y = (screenY - rect.top - viewTransform.translateY) / viewTransform.scale
-    
+
     return { x, y }
   }
 
   // ズーム処理
-  const handleWheel = useCallback((e: WheelEvent) => {
-    if (!canvasRef.current || drawMode) return
-    e.preventDefault()
-    
-    const rect = canvasRef.current.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-    
-    const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1
-    const newScale = Math.min(Math.max(viewTransform.scale * scaleFactor, 0.5), 1000)
-    
-    const scaleChange = newScale - viewTransform.scale
-    const newTranslateX = viewTransform.translateX - mouseX * scaleChange / newScale
-    const newTranslateY = viewTransform.translateY - mouseY * scaleChange / newScale
-    
-    setViewTransform({
-      scale: newScale,
-      translateX: newTranslateX,
-      translateY: newTranslateY
-    })
-  }, [drawMode, viewTransform])
+  const handleWheel = useCallback(
+    (e: WheelEvent) => {
+      if (!canvasRef.current || drawMode) return
+      e.preventDefault()
+
+      const rect = canvasRef.current.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+
+      const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1
+      const newScale = Math.min(Math.max(viewTransform.scale * scaleFactor, 0.5), 1000)
+
+      const scaleChange = newScale - viewTransform.scale
+      const newTranslateX = viewTransform.translateX - (mouseX * scaleChange) / newScale
+      const newTranslateY = viewTransform.translateY - (mouseY * scaleChange) / newScale
+
+      setViewTransform({
+        scale: newScale,
+        translateX: newTranslateX,
+        translateY: newTranslateY,
+      })
+    },
+    [drawMode, viewTransform]
+  )
 
   // ホイールイベントリスナー
   useEffect(() => {
@@ -192,11 +212,21 @@ const MeasurementPage = () => {
   }, [handleWheel])
 
   // 動的なフォントサイズ計算
-  const calculateOptimalFontSize = (text: string, boxWidth: number, boxHeight: number, isVertical: boolean): number => {
-    const padding = 4
+  const calculateOptimalFontSize = (
+    text: string,
+    boxWidth: number,
+    boxHeight: number,
+    isVertical: boolean
+  ): number => {
+    const padding = 2
     const availableWidth = boxWidth - padding * 2
     const availableHeight = boxHeight - padding * 2
-    
+
+    // 非常に小さいボックスの場合の特別処理
+  if (Math.min(boxWidth, boxHeight) < 15) {
+    return Math.max(1, Math.min(availableHeight * 0.6, availableWidth * 0.8))
+  }
+
     if (isVertical) {
       const charHeight = availableHeight / text.length
       const fontSize = Math.min(charHeight * 0.8, availableWidth * 0.9)
@@ -204,12 +234,12 @@ const MeasurementPage = () => {
     } else {
       const estimatedCharWidth = 0.6
       const requiredWidth = text.length * estimatedCharWidth
-      
+
       const fontSizeByWidth = availableWidth / requiredWidth
       const fontSizeByHeight = availableHeight * 0.8
-      
+
       const optimalSize = Math.min(fontSizeByWidth, fontSizeByHeight)
-      
+
       return Math.max(minFontSize, Math.min(optimalSize, 32))
     }
   }
@@ -225,11 +255,11 @@ const MeasurementPage = () => {
   // 編集確定
   const handleEditConfirm = () => {
     if (editingBoxId !== null) {
-      setBoxes(prev => prev.map(box => 
-        box.id === editingBoxId 
-          ? { ...box, value: editingValue, isManuallyEdited: true }
-          : box
-      ))
+      setBoxes((prev) =>
+        prev.map((box) =>
+          box.id === editingBoxId ? { ...box, value: editingValue, isManuallyEdited: true } : box
+        )
+      )
       setEditingBoxId(null)
       setEditingValue('')
     }
@@ -254,13 +284,13 @@ const MeasurementPage = () => {
     if (isPanning) {
       const dx = e.clientX - panStart.x
       const dy = e.clientY - panStart.y
-      
-      setViewTransform(prev => ({
+
+      setViewTransform((prev) => ({
         ...prev,
         translateX: prev.translateX + dx,
-        translateY: prev.translateY + dy
+        translateY: prev.translateY + dy,
       }))
-      
+
       setPanStart({ x: e.clientX, y: e.clientY })
     }
   }
@@ -274,12 +304,12 @@ const MeasurementPage = () => {
   const handleContextMenu = (e: React.MouseEvent, boxId: number) => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     setContextMenu({
       visible: true,
       x: e.clientX,
       y: e.clientY,
-      boxId
+      boxId,
     })
   }
 
@@ -290,31 +320,35 @@ const MeasurementPage = () => {
 
   // 桁数変更
   const changeDecimalPlaces = (boxId: number, decimalPlaces: number) => {
-    setBoxes(prev => prev.map(box => {
-      if (box.id === boxId) {
-        if (box.value) {
-          const numValue = parseFloat(box.value)
-          if (!isNaN(numValue)) {
-            return { 
-              ...box, 
-              decimalPlaces,
-              value: box.value
+    setBoxes((prev) =>
+      prev.map((box) => {
+        if (box.id === boxId) {
+          if (box.value) {
+            const numValue = parseFloat(box.value)
+            if (!isNaN(numValue)) {
+              return {
+                ...box,
+                decimalPlaces,
+                value: box.value,
+              }
             }
           }
+          return { ...box, decimalPlaces }
         }
-        return { ...box, decimalPlaces }
-      }
-      return box
-    }))
+        return box
+      })
+    )
     hideContextMenu()
   }
 
   // すべてのボックスの桁数を一括変更
   const changeAllDecimalPlaces = (decimalPlaces: number) => {
-    setBoxes(prev => prev.map(box => ({
-      ...box,
-      decimalPlaces
-    })))
+    setBoxes((prev) =>
+      prev.map((box) => ({
+        ...box,
+        decimalPlaces,
+      }))
+    )
     setDefaultDecimalPlaces(decimalPlaces)
   }
 
@@ -322,48 +356,48 @@ const MeasurementPage = () => {
   const extractMeasurementsFromPDF = async (file: File) => {
     try {
       setPdfLoadError(null)
-      
+
       // PDF.jsの読み込み待機
       let retryCount = 0
       while (!(window as any).pdfjsLib && retryCount < 10) {
-        await new Promise(resolve => setTimeout(resolve, 300))
+        await new Promise((resolve) => setTimeout(resolve, 300))
         retryCount++
       }
-      
+
       if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
         const pdfjsLib = (window as any).pdfjsLib
         console.log('PDF.js is ready, starting extraction...')
-        
+
         const arrayBuffer = await file.arrayBuffer()
-        const pdf = await pdfjsLib.getDocument({ 
+        const pdf = await pdfjsLib.getDocument({
           data: arrayBuffer,
           useSystemFonts: true,
-          standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/'
+          standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/',
         }).promise
-        
+
         console.log(`PDFページ数: ${pdf.numPages}`)
         const extractedMeasurements: Measurement[] = []
-        
+
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           const page = await pdf.getPage(pageNum)
           const textContent = await page.getTextContent()
           const textItems = textContent.items as any[]
-          
+
           // テキストアイテムを位置でソート
           const sortedItems = textItems.sort((a: any, b: any) => {
             const yDiff = b.transform[5] - a.transform[5]
             if (Math.abs(yDiff) > 2) return yDiff
             return a.transform[4] - b.transform[4]
           })
-          
+
           // 行ごとにグループ化
           const rows: any[] = []
           let currentRow: any[] = []
           let lastY: number | null = null
-          
+
           for (const item of sortedItems) {
             const y = Math.round(item.transform[5])
-            
+
             if (lastY === null || Math.abs(y - lastY) < 3) {
               currentRow.push(item)
             } else {
@@ -377,133 +411,146 @@ const MeasurementPage = () => {
           if (currentRow.length > 0) {
             rows.push(currentRow)
           }
-          
+
           // ZEISS形式かどうかを判定
           let isZeissFormat = false
           for (const row of rows) {
-            const rowText = row.map((item: any) => item.str).join(' ').trim()
-            if (rowText.includes('ZEISS CALYPSO') || (rowText.includes('測定値') && rowText.includes('設計値'))) {
+            const rowText = row
+              .map((item: any) => item.str)
+              .join(' ')
+              .trim()
+            if (
+              rowText.includes('ZEISS CALYPSO') ||
+              (rowText.includes('測定値') && rowText.includes('設計値'))
+            ) {
               isZeissFormat = true
               console.log('ZEISS形式を検出しました')
               break
             }
           }
-          
+
           // 測定データの抽出（修正版）
           for (let i = 0; i < rows.length; i++) {
             const row = rows[i]
-            const rowItems = row.map((item: any) => item.str.trim()).filter((s: string) => s.length > 0)
+            const rowItems = row
+              .map((item: any) => item.str.trim())
+              .filter((s: string) => s.length > 0)
             const rowText = rowItems.join(' ')
-            
-  // ZEISS形式のPDF処理部分の修正版
-// page.tsxの1094行目付近の if (isZeissFormat) { ... } ブロックを以下に置き換えてください
 
-if (isZeissFormat) {
-  // ZEISSフォーマットの処理
-  if (rowItems.length >= 2) {
-    let measuredValueIndex = -1
-    let measuredValue = null
-    let designValue = null
-    let upperTolerance = null
-    let lowerTolerance = null
-    let unitFound = 'mm'
-    
-    // 数値パターンを持つ要素を探す
-    for (let j = 0; j < rowItems.length; j++) {
-      const item = rowItems[j].replace(/\s*mm\s*$/, '')
-      
-      // 測定値のパターン（小数点を含む数値）
-      if (/^[-]?\d+\.\d{3,4}$/.test(item)) {
-        // 最初の数値が測定値
-        if (!measuredValue) {
-          measuredValue = item
-          measuredValueIndex = j
-        } 
-        // 2番目の数値が設計値
-        else if (!designValue) {
-          designValue = item
-        }
-        // 3番目の数値が公差(+)
-        else if (!upperTolerance) {
-          upperTolerance = item
-        }
-        // 4番目の数値が公差(-)
-        else if (!lowerTolerance) {
-          lowerTolerance = item
-        }
-      }
-    }
-    
-    // 測定値が見つかった場合、名前を構築
-    if (measuredValue && measuredValueIndex > 0) {
-      let nameParts: string[] = []
-      for (let k = 0; k < measuredValueIndex; k++) {
-        const part = rowItems[k].trim()
-        if (part &&
-            part !== '名前' &&
-            part !== '測定値' &&
-            part !== '設計値' &&
-            part !== '公差(+)' &&
-            part !== '公差(-)' &&
-            part !== '誤差' &&
-            part !== '+/-') {
-          nameParts.push(part)
-        }
-      }
-      
-      let name = nameParts.join('')
-      
-      if (name && measuredValue) {
-        const exists = extractedMeasurements.some(m => 
-          m.name === name && m.value === measuredValue
-        )
-        
-        if (!exists) {
-          // 許容範囲チェック
-          let isOutOfTolerance = false
-          if (designValue && upperTolerance && lowerTolerance) {
-            const measured = parseFloat(measuredValue)
-            const design = parseFloat(designValue)
-            const upper = parseFloat(upperTolerance)
-            const lower = parseFloat(lowerTolerance)
-            
-            if (!isNaN(measured) && !isNaN(design) && !isNaN(upper) && !isNaN(lower)) {
-              const error = measured - design
-              // 公差範囲外かチェック
-              isOutOfTolerance = error > upper || error < lower
-            }
-          }
-          
-          extractedMeasurements.push({
-            name: name,
-            value: measuredValue,
-            unit: unitFound,
-            isOutOfTolerance: isOutOfTolerance
-          })
-          console.log(`ZEISS形式: ${name} = ${measuredValue} ${unitFound}${isOutOfTolerance ? ' [許容範囲外]' : ''}`)
-        }
-      }
-    }
-  }
-}else {
+            // ZEISS形式のPDF処理部分の修正版
+            // page.tsxの1094行目付近の if (isZeissFormat) { ... } ブロックを以下に置き換えてください
+
+            if (isZeissFormat) {
+              // ZEISSフォーマットの処理
+              if (rowItems.length >= 2) {
+                let measuredValueIndex = -1
+                let measuredValue = null
+                let designValue = null
+                let upperTolerance = null
+                let lowerTolerance = null
+                let unitFound = 'mm'
+
+                // 数値パターンを持つ要素を探す
+                for (let j = 0; j < rowItems.length; j++) {
+                  const item = rowItems[j].replace(/\s*mm\s*$/, '')
+
+                  // 測定値のパターン（小数点を含む数値）
+                  if (/^[-]?\d+\.\d{3,4}$/.test(item)) {
+                    // 最初の数値が測定値
+                    if (!measuredValue) {
+                      measuredValue = item
+                      measuredValueIndex = j
+                    }
+                    // 2番目の数値が設計値
+                    else if (!designValue) {
+                      designValue = item
+                    }
+                    // 3番目の数値が公差(+)
+                    else if (!upperTolerance) {
+                      upperTolerance = item
+                    }
+                    // 4番目の数値が公差(-)
+                    else if (!lowerTolerance) {
+                      lowerTolerance = item
+                    }
+                  }
+                }
+
+                // 測定値が見つかった場合、名前を構築
+                if (measuredValue && measuredValueIndex > 0) {
+                  let nameParts: string[] = []
+                  for (let k = 0; k < measuredValueIndex; k++) {
+                    const part = rowItems[k].trim()
+                    if (
+                      part &&
+                      part !== '名前' &&
+                      part !== '測定値' &&
+                      part !== '設計値' &&
+                      part !== '公差(+)' &&
+                      part !== '公差(-)' &&
+                      part !== '誤差' &&
+                      part !== '+/-'
+                    ) {
+                      nameParts.push(part)
+                    }
+                  }
+
+                  let name = nameParts.join('')
+
+                  if (name && measuredValue) {
+                    const exists = extractedMeasurements.some(
+                      (m) => m.name === name && m.value === measuredValue
+                    )
+
+                    if (!exists) {
+                      // 許容範囲チェック
+                      let isOutOfTolerance = false
+                      if (designValue && upperTolerance && lowerTolerance) {
+                        const measured = parseFloat(measuredValue)
+                        const design = parseFloat(designValue)
+                        const upper = parseFloat(upperTolerance)
+                        const lower = parseFloat(lowerTolerance)
+
+                        if (!isNaN(measured) && !isNaN(design) && !isNaN(upper) && !isNaN(lower)) {
+                          const error = measured - design
+                          // 公差範囲外かチェック
+                          isOutOfTolerance = error > upper || error < lower
+                        }
+                      }
+
+                      extractedMeasurements.push({
+                        name: name,
+                        value: measuredValue,
+                        unit: unitFound,
+                        isOutOfTolerance: isOutOfTolerance,
+                      })
+                      console.log(
+                        `ZEISS形式: ${name} = ${measuredValue} ${unitFound}${isOutOfTolerance ? ' [許容範囲外]' : ''}`
+                      )
+                    }
+                  }
+                }
+              }
+            } else {
               // Calypso形式のパターン（既存のまま）
               const calypsoPatterns = [
                 /^(.+?)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s*/,
                 /^([A-Za-z_\-]+[\d_]*(?:_[A-Za-z0-9]+)*)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s*/,
               ]
-              
+
               for (const pattern of calypsoPatterns) {
                 const match = rowText.match(pattern)
                 if (match) {
-                  let name = match[1].trim()
+                  let name = match[1]
+                    .trim()
                     .replace(/\s+/g, '')
                     .replace(/([A-Z])-([A-Z])/g, '$1-$2')
                     .replace(/([^_])_([^_])/g, '$1_$2')
-                  const measuredValue = match[2]  // 実測値
-                  const designValue = match[3]     // 基準値
-                  const upperTolerance = match[4]  // 上許容差
-                  const lowerTolerance = match[5]  // 下許容差
-                  
+                  const measuredValue = match[2] // 実測値
+                  const designValue = match[3] // 基準値
+                  const upperTolerance = match[4] // 上許容差
+                  const lowerTolerance = match[5] // 下許容差
+
                   // 許容範囲チェック
                   let isOutOfTolerance = false
                   if (measuredValue && designValue && upperTolerance && lowerTolerance) {
@@ -511,25 +558,27 @@ if (isZeissFormat) {
                     const design = parseFloat(designValue)
                     const upper = parseFloat(upperTolerance)
                     const lower = parseFloat(lowerTolerance)
-                    
+
                     if (!isNaN(measured) && !isNaN(design) && !isNaN(upper) && !isNaN(lower)) {
                       const error = measured - design
                       isOutOfTolerance = error > upper || error < lower
                     }
                   }
-                  
-                  const exists = extractedMeasurements.some(m => 
-                    m.name === name && m.value === measuredValue
+
+                  const exists = extractedMeasurements.some(
+                    (m) => m.name === name && m.value === measuredValue
                   )
-                  
+
                   if (!exists && !name.includes('設計値') && !name.includes('公差')) {
                     extractedMeasurements.push({
                       name: name,
                       value: measuredValue,
                       unit: 'mm',
-                      isOutOfTolerance: isOutOfTolerance
+                      isOutOfTolerance: isOutOfTolerance,
                     })
-                    console.log(`Calypso形式: ${name} = ${measuredValue} mm${isOutOfTolerance ? ' [許容範囲外]' : ''}`)
+                    console.log(
+                      `Calypso形式: ${name} = ${measuredValue} mm${isOutOfTolerance ? ' [許容範囲外]' : ''}`
+                    )
                     break
                   }
                 }
@@ -537,9 +586,9 @@ if (isZeissFormat) {
             }
           }
         }
-        
+
         console.log('抽出された測定値:', extractedMeasurements)
-        
+
         if (extractedMeasurements.length > 0) {
           setMeasurements(extractedMeasurements)
           setPdfLoaded(true)
@@ -548,13 +597,11 @@ if (isZeissFormat) {
           console.log('自動抽出失敗、フォールバックデータを使用')
           loadFallbackData()
         }
-        
       } else {
         console.error('PDF.jsがロードされていません')
         setPdfLoadError('PDF.jsのロードに失敗しました')
         loadFallbackData()
       }
-      
     } catch (error) {
       console.error('PDF解析エラー:', error)
       setPdfLoadError('PDF解析中にエラーが発生しました')
@@ -565,7 +612,7 @@ if (isZeissFormat) {
   // フォールバックデータ（ZEISS形式のサンプルデータに更新）
   const loadFallbackData = () => {
     setPdfLoadError('PDFの自動解析に失敗したため、手動データを使用します。')
-    
+
     const manualData: Measurement[] = [
       { name: '平面度1', value: '0.0392', unit: 'mm' },
       { name: 'X-値円1_6H7', value: '12.5385', unit: 'mm' },
@@ -575,10 +622,10 @@ if (isZeissFormat) {
       { name: '同心度3', value: '0.0706', unit: 'mm' },
       { name: '直径円16', value: '15.9222', unit: 'mm' },
     ]
-    
+
     setMeasurements(manualData)
     setPdfLoaded(true)
-    
+
     setTimeout(() => {
       alert(`手動データ使用: ${manualData.length}個の測定値をロードしました。`)
     }, 100)
@@ -588,64 +635,66 @@ if (isZeissFormat) {
   const handleDrawingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-  
+
     // TIFFファイルの処理
-    if (file.type === 'image/tiff' || file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff')) {
+    if (
+      file.type === 'image/tiff' ||
+      file.name.toLowerCase().endsWith('.tif') ||
+      file.name.toLowerCase().endsWith('.tiff')
+    ) {
       try {
         // TIFFファイルをArrayBufferとして読み込み
         const arrayBuffer = await file.arrayBuffer()
-        
+
         // UTIFでデコード
         const ifds = UTIF.decode(arrayBuffer)
-        
+
         if (ifds.length === 0) {
           alert('TIFFファイルの読み込みに失敗しました')
           return
         }
-        
+
         // 最初のページをデコード
         const firstPage = ifds[0]
         UTIF.decodeImage(arrayBuffer, firstPage)
-        
+
         // RGBAデータを取得
         const rgba = UTIF.toRGBA8(firstPage)
-        
+
         // Canvasに描画
         const canvas = document.createElement('canvas')
         canvas.width = firstPage.width
         canvas.height = firstPage.height
-        
+
         const ctx = canvas.getContext('2d')
         if (!ctx) {
           alert('Canvas作成に失敗しました')
           return
         }
-        
+
         // ImageDataを作成
         const imageData = new ImageData(
           new Uint8ClampedArray(rgba.buffer),
           firstPage.width,
           firstPage.height
         )
-        
+
         // Canvasに描画
         ctx.putImageData(imageData, 0, 0)
-        
+
         // CanvasをData URLに変換
         const dataUrl = canvas.toDataURL('image/png')
-        
+
         // 画像として設定
         setDrawingImage(dataUrl)
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
-        
+
         console.log(`TIFF画像を変換しました: ${firstPage.width}x${firstPage.height}`)
-        
       } catch (error) {
         console.error('TIFF処理エラー:', error)
         alert('TIFFファイルの処理中にエラーが発生しました')
       }
-      
-    } 
+    }
     // 通常の画像ファイルの処理（JPEG、PNG等）
     else if (file.type.startsWith('image/')) {
       const reader = new FileReader()
@@ -654,8 +703,7 @@ if (isZeissFormat) {
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
       }
       reader.readAsDataURL(file)
-    } 
-    else {
+    } else {
       alert('対応していないファイル形式です。JPEG、PNG、TIFFファイルを選択してください。')
     }
   }
@@ -674,21 +722,21 @@ if (isZeissFormat) {
       console.warn('Invalid event object')
       return
     }
-    
+
     e.preventDefault()
     e.stopPropagation()
-    
+
     if (e.button === 2) return
-    
+
     if (!drawMode) {
       handlePanStart(e)
       return
     }
-    
+
     if (!drawingImage || !canvasRef.current) return
-    
+
     const canvasPos = screenToCanvas(e.clientX, e.clientY)
-    
+
     setIsDrawing(true)
     setStartPos(canvasPos)
     setCurrentBox({
@@ -699,7 +747,7 @@ if (isZeissFormat) {
       height: 0,
       value: null,
       index: boxes.length,
-      decimalPlaces: defaultDecimalPlaces
+      decimalPlaces: defaultDecimalPlaces,
     })
   }
 
@@ -708,64 +756,68 @@ if (isZeissFormat) {
     if (!e || typeof e.preventDefault !== 'function') {
       return
     }
-    
+
     e.preventDefault()
-    
+
     if (isPanning) {
       handlePanMove(e)
       return
     }
-    
+
     if (canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect()
       const x = e.clientX - rect.left
       const y = e.clientY - rect.top
-      
+
       setMousePos({ x, y })
-      
+
       if (hoveredBox !== null) {
-        const box = boxes.find(b => b.id === hoveredBox)
+        const box = boxes.find((b) => b.id === hoveredBox)
         if (box && box.value) {
           const tooltipWidth = 200
           const tooltipHeight = 80
           const padding = 15
-          
+
           let tooltipX = x + padding
           let tooltipY = y - tooltipHeight - 5
-          
+
           if (x + tooltipWidth + padding > rect.width) {
             tooltipX = x - tooltipWidth - padding
           }
-          
+
           if (y - tooltipHeight - 5 < 0) {
             tooltipY = y + padding
           }
-          
+
           if (tooltipX < 0) {
             tooltipX = padding
           }
-          
+
           setTooltipPosition({ x: tooltipX, y: tooltipY })
         }
       }
     }
-    
+
     if (!isDrawing || !currentBox || !canvasRef.current) return
-    
+
     const canvasPos = screenToCanvas(e.clientX, e.clientY)
-    
+
     const width = Math.abs(canvasPos.x - startPos.x)
     const height = Math.abs(canvasPos.y - startPos.y)
     const x = Math.min(startPos.x, canvasPos.x)
     const y = Math.min(startPos.y, canvasPos.y)
-    
-    setCurrentBox(prev => prev ? {
-      ...prev,
-      x,
-      y,
-      width,
-      height
-    } : null)
+
+    setCurrentBox((prev) =>
+      prev
+        ? {
+            ...prev,
+            x,
+            y,
+            width,
+            height,
+          }
+        : null
+    )
   }
 
   // マウスアップ処理（修正版）
@@ -773,20 +825,20 @@ if (isZeissFormat) {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault()
     }
-    
+
     if (isPanning) {
       handlePanEnd()
       return
     }
-    
+
     if (!isDrawing || !currentBox) return
-    
+
     setIsDrawing(false)
-    
+
     if (currentBox.width > minBoxSize && currentBox.height > minBoxSize) {
-      setBoxes(prev => [...prev, currentBox])
+      setBoxes((prev) => [...prev, currentBox])
     }
-    
+
     setCurrentBox(null)
   }
 
@@ -800,7 +852,7 @@ if (isZeissFormat) {
         return {
           ...box,
           value: measurements[index].value,
-          isOutOfTolerance: measurements[index].isOutOfTolerance
+          isOutOfTolerance: measurements[index].isOutOfTolerance,
         }
       }
       return box
@@ -827,26 +879,26 @@ if (isZeissFormat) {
         setHoveredBox(null)
         hideContextMenu()
         setEditingBoxId(null)
-        
+
         const tempTransform = viewTransform
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
-        
+
         const tempShowNumbers = showBoxNumbers
         const tempShowDelete = showDeleteButtons
         setShowBoxNumbers(false)
         setShowDeleteButtons(false)
-        
+
         setTimeout(async () => {
           const canvas = await html2canvas(canvasRef.current!, {
             useCORS: true,
             allowTaint: true,
-            backgroundColor: 'white'
+            backgroundColor: 'white',
           })
           const link = document.createElement('a')
           link.download = `measurement_result_${new Date().getTime()}.png`
           link.href = canvas.toDataURL()
           link.click()
-          
+
           setViewTransform(tempTransform)
           setShowBoxNumbers(tempShowNumbers)
           setShowDeleteButtons(tempShowDelete)
@@ -860,16 +912,17 @@ if (isZeissFormat) {
 
   // ボックス削除
   const deleteBox = (boxId: number) => {
-    setBoxes(prev => prev.filter(box => box.id !== boxId))
+    setBoxes((prev) => prev.filter((box) => box.id !== boxId))
   }
 
   // スタイル定義
   const styles = {
     container: {
-      fontFamily: '"Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif',
+      fontFamily:
+        '"Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       minHeight: '100vh',
-      padding: '20px'
+      padding: '20px',
     },
     mainContainer: {
       maxWidth: '1400px',
@@ -877,14 +930,14 @@ if (isZeissFormat) {
       background: 'white',
       borderRadius: '20px',
       boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
-      overflow: 'hidden'
+      overflow: 'hidden',
     },
     header: {
       background: 'linear-gradient(135deg, #DDDDDD 10%, #888888 100%)',
       color: 'white',
       padding: '20px',
       textAlign: 'center' as const,
-      position: 'relative' as const
+      position: 'relative' as const,
     },
     controls: {
       padding: '20px',
@@ -893,7 +946,7 @@ if (isZeissFormat) {
       display: 'flex',
       gap: '15px',
       flexWrap: 'wrap' as const,
-      alignItems: 'center'
+      alignItems: 'center',
     },
     uploadBtn: {
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -903,7 +956,7 @@ if (isZeissFormat) {
       borderRadius: '25px',
       cursor: 'pointer',
       fontWeight: '600',
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     },
     actionBtn: (active: boolean) => ({
       padding: '8px 16px',
@@ -913,18 +966,18 @@ if (isZeissFormat) {
       color: active ? 'white' : '#667eea',
       cursor: 'pointer',
       fontWeight: '600',
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     }),
     mainContent: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
       gap: '20px',
-      padding: '20px'
+      padding: '20px',
     },
     panel: {
       background: '#f8f9fa',
       borderRadius: '15px',
-      padding: '20px'
+      padding: '20px',
     },
     canvasContainer: {
       position: 'relative' as const,
@@ -938,7 +991,7 @@ if (isZeissFormat) {
       userSelect: 'none' as const,
       WebkitUserSelect: 'none' as const,
       MozUserSelect: 'none' as const,
-      msUserSelect: 'none' as const
+      msUserSelect: 'none' as const,
     },
     transformContainer: {
       position: 'absolute' as const,
@@ -948,7 +1001,7 @@ if (isZeissFormat) {
       height: '100%',
       transform: `scale(${viewTransform.scale}) translate(${viewTransform.translateX / viewTransform.scale}px, ${viewTransform.translateY / viewTransform.scale}px)`,
       transformOrigin: '0 0',
-      transition: isPanning ? 'none' : 'transform 0.2s ease'
+      transition: isPanning ? 'none' : 'transform 0.2s ease',
     },
     image: {
       maxWidth: '100%',
@@ -958,34 +1011,61 @@ if (isZeissFormat) {
       userSelect: 'none' as const,
       WebkitUserDrag: 'none' as const,
       MozUserDrag: 'none' as const,
-      userDrag: 'none' as const
+      userDrag: 'none' as const,
     },
-    box: (isVertical: boolean, fontSize: number, textColor: string, isEditing: boolean, borderWidth: number, isOutOfTolerance?: boolean) => ({
-      position: 'absolute' as const,
-      border: isEditing 
-        ? `${Math.max(2, borderWidth)}px solid #00ff00` 
-        : isOutOfTolerance
-          ? `${Math.max(2, borderWidth)}px solid #ff0000`  // 許容範囲外は赤枠
-          : textColor === 'white' 
-            ? `${borderWidth}px solid #ffffff` 
-            : `${borderWidth}px solid #ff6b6b`,
-      background: isEditing
-        ? 'rgba(0, 255, 0, 0.1)'
-        : isOutOfTolerance
-          ? 'rgba(255, 0, 0, 0.2)'  // 許容範囲外は赤背景
-          : textColor === 'white' 
-            ? 'rgba(0, 0, 0, 0.7)' 
-            : 'rgba(255, 107, 107, 0.1)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: drawMode ? 'default' : 'move',
-      writingMode: isVertical ? ('vertical-rl' as const) : ('horizontal-tb' as const),
-      textOrientation: isVertical ? ('upright' as const) : ('mixed' as const),
-      userSelect: 'none' as const,
-      fontSize: `${fontSize}px`,
-      fontFamily: '"Noto Sans JP", sans-serif'
-    }),
+    box: (
+      isVertical: boolean,
+      fontSize: number,
+      textColor: string,
+      isEditing: boolean,
+      borderWidth: number,
+      isOutOfTolerance?: boolean,
+      boxSize?: number
+    ) => {
+      // ボックスサイズに応じて背景の透明度を調整
+      const getBackgroundAlpha = () => {
+        if (!boxSize) return isOutOfTolerance ? 0.2 : 0.1
+        
+        // 小さいボックスほど透明度を上げる（薄くする）
+        if (isOutOfTolerance) {
+          if (boxSize < 30) return 0.05  // 非常に小さい場合はほぼ透明
+          if (boxSize < 50) return 0.1
+          if (boxSize < 100) return 0.15
+          return 0.2
+        }
+        
+        // 通常のボックス
+        if (textColor === 'white') return 0.7
+        return 0.1
+      }
+      
+      return {
+        position: 'absolute' as const,
+        border: isEditing 
+          ? `${Math.max(2, borderWidth)}px solid #00ff00` 
+          : isOutOfTolerance
+            ? `${borderWidth}px solid #ff0000`  // 許容範囲外は赤枠
+            : textColor === 'white' 
+              ? `${borderWidth}px solid #ffffff` 
+              : `${borderWidth}px solid #ff6b6b`,
+        background: isEditing
+          ? 'rgba(0, 255, 0, 0.1)'
+          : isOutOfTolerance
+            ? `rgba(255, 0, 0, ${getBackgroundAlpha()})`  // 動的な透明度
+            : textColor === 'white' 
+              ? `rgba(0, 0, 0, ${getBackgroundAlpha()})` 
+              : `rgba(255, 107, 107, ${getBackgroundAlpha()})`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: drawMode ? 'default' : 'move',
+        writingMode: isVertical ? ('vertical-rl' as const) : ('horizontal-tb' as const),
+        textOrientation: isVertical ? ('upright' as const) : ('mixed' as const),
+        userSelect: 'none' as const,
+        fontSize: `${fontSize}px`,
+        fontFamily: '"Noto Sans JP", sans-serif'
+      }
+    },
     boxNumber: (textColor: string, scaledSize: number) => ({
       position: 'absolute' as const,
       top: `-${scaledSize + 10}px`,
@@ -999,18 +1079,18 @@ if (isZeissFormat) {
       writingMode: 'horizontal-tb' as const,
       zIndex: 10,
       fontFamily: '"Noto Sans JP", sans-serif',
-      display: showBoxNumbers ? 'block' : 'none'
+      display: showBoxNumbers ? 'block' : 'none',
     }),
     boxValue: (textColor: string, isOutOfTolerance?: boolean) => ({
-  fontWeight: 'bold' as const,
-  color: isOutOfTolerance 
-    ? '#ff0000'  // 許容範囲外は赤文字
-    : textColor === 'white' 
-      ? '#ffffff' 
-      : '#333333',
-  padding: '2px',
-  fontFamily: '"Noto Sans JP", sans-serif'
-}),
+      fontWeight: 'bold' as const,
+      color: isOutOfTolerance
+        ? '#ff0000' // 許容範囲外は赤文字
+        : textColor === 'white'
+          ? '#ffffff'
+          : '#333333',
+      padding: '2px',
+      fontFamily: '"Noto Sans JP", sans-serif',
+    }),
     editInput: {
       position: 'absolute' as const,
       top: '50%',
@@ -1024,7 +1104,7 @@ if (isZeissFormat) {
       borderRadius: '4px',
       background: 'white',
       zIndex: 100,
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     },
     measurementList: {
       background: 'white',
@@ -1032,7 +1112,7 @@ if (isZeissFormat) {
       borderRadius: '10px',
       padding: '15px',
       maxHeight: '400px',
-      overflowY: 'auto' as const
+      overflowY: 'auto' as const,
     },
     measurementItem: (assigned: boolean, outOfTolerance?: boolean) => ({
       padding: '8px',
@@ -1042,16 +1122,17 @@ if (isZeissFormat) {
       display: 'flex',
       justifyContent: 'space-between',
       fontSize: '14px',
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     }),
     deleteBtn: (textColor: string, scaledSize: number) => ({
       position: 'absolute' as const,
       top: `${scaledSize * 0.3}px`,
       right: `${scaledSize * 0.3}px`,
       background: textColor === 'white' ? 'rgba(255,255,255,0.9)' : 'white',
-      border: textColor === 'white' 
-        ? `${Math.max(1, scaledSize * 0.05)}px solid #ffffff` 
-        : `${Math.max(1, scaledSize * 0.05)}px solid #ff6b6b`,
+      border:
+        textColor === 'white'
+          ? `${Math.max(1, scaledSize * 0.05)}px solid #ffffff`
+          : `${Math.max(1, scaledSize * 0.05)}px solid #ff6b6b`,
       borderRadius: '50%',
       width: `${scaledSize * 1.3}px`,
       height: `${scaledSize * 1.3}px`,
@@ -1063,14 +1144,14 @@ if (isZeissFormat) {
       color: textColor === 'white' ? '#000000' : '#ff6b6b',
       fontWeight: 'bold' as const,
       zIndex: 10,
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     }),
     errorMessage: {
       background: '#f8d7da',
       color: '#721c24',
       padding: '10px',
       borderRadius: '5px',
-      marginTop: '10px'
+      marginTop: '10px',
     },
     tooltip: {
       position: 'absolute' as const,
@@ -1086,7 +1167,7 @@ if (isZeissFormat) {
       whiteSpace: 'nowrap' as const,
       border: '1px solid rgba(255,255,255,0.2)',
       backdropFilter: 'blur(8px)',
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     },
     contextMenu: {
       position: 'fixed' as const,
@@ -1095,7 +1176,7 @@ if (isZeissFormat) {
       boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
       padding: '8px 0',
       zIndex: 2000,
-      minWidth: '200px'
+      minWidth: '200px',
     },
     contextMenuItem: {
       padding: '8px 16px',
@@ -1106,7 +1187,7 @@ if (isZeissFormat) {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     },
     zoomInfo: {
       position: 'absolute' as const,
@@ -1118,7 +1199,7 @@ if (isZeissFormat) {
       borderRadius: '4px',
       fontSize: '12px',
       zIndex: 100,
-      fontFamily: '"Noto Sans JP", sans-serif'
+      fontFamily: '"Noto Sans JP", sans-serif',
     },
     decimalControl: {
       display: 'flex',
@@ -1126,8 +1207,8 @@ if (isZeissFormat) {
       gap: '10px',
       padding: '5px 10px',
       background: '#f0f0f0',
-      borderRadius: '15px'
-    }
+      borderRadius: '15px',
+    },
   }
 
   // ドラッグ防止
@@ -1138,9 +1219,9 @@ if (isZeissFormat) {
         return false
       }
     }
-    
+
     document.addEventListener('dragstart', preventDrag)
-    
+
     return () => {
       document.removeEventListener('dragstart', preventDrag)
     }
@@ -1160,7 +1241,7 @@ if (isZeissFormat) {
           <h1>📊 図面測定値転記システム</h1>
           <p>CalypsoとZEISS両形式のPDFに対応</p>
         </div>
-        
+
         <div style={styles.controls}>
           <label>
             <input
@@ -1170,14 +1251,11 @@ if (isZeissFormat) {
               style={{ display: 'none' }}
               ref={fileInputRef}
             />
-            <button 
-              style={styles.uploadBtn}
-              onClick={() => fileInputRef.current?.click()}
-            >
+            <button style={styles.uploadBtn} onClick={() => fileInputRef.current?.click()}>
               📐 図面をアップロード
             </button>
           </label>
-          
+
           <label>
             <input
               type="file"
@@ -1186,21 +1264,15 @@ if (isZeissFormat) {
               style={{ display: 'none' }}
               ref={pdfInputRef}
             />
-            <button 
-              style={styles.uploadBtn}
-              onClick={() => pdfInputRef.current?.click()}
-            >
+            <button style={styles.uploadBtn} onClick={() => pdfInputRef.current?.click()}>
               📄 測定結果PDFをアップロード
             </button>
           </label>
-          
-          <button
-            style={styles.actionBtn(drawMode)}
-            onClick={() => setDrawMode(!drawMode)}
-          >
+
+          <button style={styles.actionBtn(drawMode)} onClick={() => setDrawMode(!drawMode)}>
             {drawMode ? '✏️ 描画モード' : '🤚 移動・編集モード'}
           </button>
-          
+
           <button
             style={styles.actionBtn(showBoxNumbers)}
             onClick={() => setShowBoxNumbers(!showBoxNumbers)}
@@ -1208,7 +1280,7 @@ if (isZeissFormat) {
           >
             {showBoxNumbers ? '🔢 番号表示' : '🔢 番号非表示'}
           </button>
-          
+
           <button
             style={styles.actionBtn(showDeleteButtons)}
             onClick={() => setShowDeleteButtons(!showDeleteButtons)}
@@ -1216,14 +1288,11 @@ if (isZeissFormat) {
           >
             {showDeleteButtons ? '❌ 削除ボタン表示' : '❌ 削除ボタン非表示'}
           </button>
-          
-          <button
-            style={styles.actionBtn(false)}
-            onClick={clearBoxes}
-          >
+
+          <button style={styles.actionBtn(false)} onClick={clearBoxes}>
             🗑️ ボックスをクリア
           </button>
-          
+
           <button
             style={styles.actionBtn(false)}
             onClick={autoAssignValues}
@@ -1231,29 +1300,23 @@ if (isZeissFormat) {
           >
             🔄 測定値を自動転記
           </button>
-          
+
           <button
             style={styles.actionBtn(textColorMode === 'white')}
-            onClick={() => setTextColorMode(prev => prev === 'black' ? 'white' : 'black')}
+            onClick={() => setTextColorMode((prev) => (prev === 'black' ? 'white' : 'black'))}
             title="文字色を切り替え"
           >
             {textColorMode === 'black' ? '⚫' : '⚪'} 文字色
           </button>
-          
-          <button
-            style={styles.actionBtn(false)}
-            onClick={resetView}
-          >
+
+          <button style={styles.actionBtn(false)} onClick={resetView}>
             🔄 表示リセット
           </button>
-          
-          <button
-            style={styles.actionBtn(false)}
-            onClick={exportResult}
-          >
+
+          <button style={styles.actionBtn(false)} onClick={exportResult}>
             💾 結果を保存
           </button>
-          
+
           <div style={styles.decimalControl}>
             <span>デフォルト桁数:</span>
             <input
@@ -1262,37 +1325,47 @@ if (isZeissFormat) {
               max="4"
               value={defaultDecimalPlaces}
               onChange={(e) => setDefaultDecimalPlaces(parseInt(e.target.value) || 0)}
-              style={{ width: '50px', padding: '2px 5px', borderRadius: '5px', border: '1px solid #ccc' }}
+              style={{
+                width: '50px',
+                padding: '2px 5px',
+                borderRadius: '5px',
+                border: '1px solid #ccc',
+              }}
             />
             <button
               onClick={() => changeAllDecimalPlaces(defaultDecimalPlaces)}
-              style={{ 
-                padding: '2px 8px', 
-                background: '#667eea', 
-                color: 'white', 
-                border: 'none', 
+              style={{
+                padding: '2px 8px',
+                background: '#667eea',
+                color: 'white',
+                border: 'none',
                 borderRadius: '5px',
                 cursor: 'pointer',
-                fontSize: '12px'
+                fontSize: '12px',
               }}
             >
               一括適用
             </button>
           </div>
-          
+
           <div style={styles.decimalControl}>
             <span>最小ボックス:</span>
             <input
               type="number"
-              min="3"
+              min="1"
               max="20"
               value={minBoxSize}
               onChange={(e) => setMinBoxSize(parseInt(e.target.value) || 3)}
-              style={{ width: '50px', padding: '2px 5px', borderRadius: '5px', border: '1px solid #ccc' }}
+              style={{
+                width: '50px',
+                padding: '2px 5px',
+                borderRadius: '5px',
+                border: '1px solid #ccc',
+              }}
             />
             <span>px</span>
           </div>
-          
+
           <div style={styles.decimalControl}>
             <span>最小フォント:</span>
             <input
@@ -1301,12 +1374,17 @@ if (isZeissFormat) {
               max="6"
               value={minFontSize}
               onChange={(e) => setMinFontSize(parseInt(e.target.value) || 1)}
-              style={{ width: '50px', padding: '2px 5px', borderRadius: '5px', border: '1px solid #ccc' }}
+              style={{
+                width: '50px',
+                padding: '2px 5px',
+                borderRadius: '5px',
+                border: '1px solid #ccc',
+              }}
             />
             <span>px</span>
           </div>
         </div>
-        
+
         <div style={styles.mainContent}>
           <div style={styles.panel}>
             <h3>図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
@@ -1321,37 +1399,51 @@ if (isZeissFormat) {
             >
               <div style={styles.transformContainer}>
                 {drawingImage && (
-                  <img 
-                    src={drawingImage} 
-                    style={styles.image} 
+                  <img
+                    src={drawingImage}
+                    style={styles.image}
                     alt="Drawing"
                     draggable={false}
                     onDragStart={(e) => e.preventDefault()}
                   />
                 )}
-                
+
                 {/* 作成済みボックス */}
                 {boxes.map((box) => {
                   const isVertical = box.height > box.width * 1.5
                   const formattedValue = formatValue(box.value, box.decimalPlaces)
-                  const fontSize = box.value 
+                  const fontSize = box.value
                     ? calculateOptimalFontSize(formattedValue, box.width, box.height, isVertical)
                     : 14
                   const isEditing = editingBoxId === box.id
-                  
-                  const borderWidth = calculateBorderWidth(box.width, box.height, viewTransform.scale)
+
+                  const borderWidth = calculateBorderWidth(
+                    box.width,
+                    box.height,
+                    viewTransform.scale
+                  )
                   const scaledNumberSize = getScaledElementSize(14, viewTransform.scale)
                   const scaledDeleteBtnSize = getScaledElementSize(16, viewTransform.scale)
-                  
+                  // ボックスの最小サイズを計算
+  const minBoxDimension = Math.min(box.width, box.height)
+
                   return (
                     <div
                       key={box.id}
                       style={{
-                        ...styles.box(isVertical, fontSize, textColorMode, isEditing, borderWidth, box.isOutOfTolerance),
+                        ...styles.box(
+                          isVertical,
+                          fontSize,
+                          textColorMode,
+                          isEditing,
+                          borderWidth,
+                          box.isOutOfTolerance,
+                          minBoxDimension
+                        ),
                         left: `${box.x}px`,
                         top: `${box.y}px`,
                         width: `${box.width}px`,
-                        height: `${box.height}px`
+                        height: `${box.height}px`,
                       }}
                       onMouseDown={(e) => e.stopPropagation()}
                       onContextMenu={(e) => handleContextMenu(e, box.id)}
@@ -1362,16 +1454,17 @@ if (isZeissFormat) {
                           if (canvasRef.current) {
                             const rect = canvasRef.current.getBoundingClientRect()
                             const boxRect = e.currentTarget.getBoundingClientRect()
-                            const x = (boxRect.left - rect.left + box.width / 2) * viewTransform.scale
+                            const x =
+                              (boxRect.left - rect.left + box.width / 2) * viewTransform.scale
                             const y = (boxRect.top - rect.top) * viewTransform.scale
-                            
+
                             const tooltipWidth = 200
                             const tooltipHeight = 80
                             const padding = 10
-                            
+
                             let tooltipX = x - tooltipWidth / 2
                             let tooltipY = y - tooltipHeight - padding
-                            
+
                             if (tooltipX < 0) tooltipX = padding
                             if (tooltipX + tooltipWidth > rect.width) {
                               tooltipX = rect.width - tooltipWidth - padding
@@ -1379,43 +1472,49 @@ if (isZeissFormat) {
                             if (tooltipY < 0) {
                               tooltipY = y + box.height * viewTransform.scale + padding
                             }
-                            
+
                             setTooltipPosition({ x: tooltipX, y: tooltipY })
                           }
                         }
                       }}
                       onMouseLeave={() => setHoveredBox(null)}
                     >
-                      <span style={styles.boxNumber(textColorMode, scaledNumberSize)}>
+       <span style={styles.boxNumber(textColorMode, scaledNumberSize)}>
                         {box.index + 1}
                         {box.isManuallyEdited && ' ✏️'}
                       </span>
-                      
+                      {/* 値の表示部分 */}
                       {isEditing ? (
-        <input
-          ref={editInputRef}
-          type="text"
-          value={editingValue}
-          onChange={(e) => setEditingValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleEditConfirm()
-            } else if (e.key === 'Escape') {
-              handleEditCancel()
-            }
-          }}
-          onBlur={handleEditConfirm}
-          style={styles.editInput}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        box.value && (
-          <span style={styles.boxValue(textColorMode, box.isOutOfTolerance)}>
-            {formattedValue}
-          </span>
-        )
-      )}
-                      
+                        <input
+                          ref={editInputRef}
+                          type="text"
+                          value={editingValue}
+                          onChange={(e) => setEditingValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleEditConfirm()
+                            } else if (e.key === 'Escape') {
+                              handleEditCancel()
+                            }
+                          }}
+                          onBlur={handleEditConfirm}
+                          style={styles.editInput}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        box.value && (
+                          <span style={{
+                            ...styles.boxValue(textColorMode, box.isOutOfTolerance),
+                            // 小さいボックスでも見やすくするための追加スタイル
+                            textShadow: box.isOutOfTolerance && minBoxDimension < 50
+                              ? '0 0 2px white, 0 0 4px white'  // 白い縁取りで文字を読みやすく
+                              : 'none'
+                          }}>
+                            {formattedValue}
+                          </span>
+                        )
+                      )}
+
                       {!isEditing && (
                         <button
                           style={styles.deleteBtn(textColorMode, scaledDeleteBtnSize)}
@@ -1430,7 +1529,7 @@ if (isZeissFormat) {
                     </div>
                   )
                 })}
-                
+
                 {/* 描画中のボックス */}
                 {currentBox && (
                   <div
@@ -1440,54 +1539,62 @@ if (isZeissFormat) {
                         14,
                         textColorMode,
                         false,
-                        calculateBorderWidth(currentBox.width, currentBox.height, viewTransform.scale)
+                        calculateBorderWidth(
+                          currentBox.width,
+                          currentBox.height,
+                          viewTransform.scale
+                        )
                       ),
                       left: `${currentBox.x}px`,
                       top: `${currentBox.y}px`,
                       width: `${currentBox.width}px`,
                       height: `${currentBox.height}px`,
-                      opacity: 0.5
+                      opacity: 0.5,
                     }}
                   >
-                    <span style={{ 
-                      fontSize: `${getScaledElementSize(10, viewTransform.scale)}px`, 
-                      opacity: 0.7 
-                    }}>
+                    <span
+                      style={{
+                        fontSize: `${getScaledElementSize(10, viewTransform.scale)}px`,
+                        opacity: 0.7,
+                      }}
+                    >
                       {Math.round(currentBox.width)}×{Math.round(currentBox.height)}px
                     </span>
                   </div>
                 )}
               </div>
-              
+
               {/* ツールチップ */}
-              {hoveredBox !== null && (
+              {hoveredBox !== null &&
                 (() => {
-                  const box = boxes.find(b => b.id === hoveredBox)
+                  const box = boxes.find((b) => b.id === hoveredBox)
                   if (!box || !box.value) return null
                   const measurement = measurements[box.index]
-                  
+
                   return (
                     <div
                       style={{
                         ...styles.tooltip,
                         left: `${tooltipPosition.x}px`,
                         top: `${tooltipPosition.y}px`,
-                        borderColor: box.isOutOfTolerance ? '#ff0000' : 'rgba(255,255,255,0.2)'
+                        borderColor: box.isOutOfTolerance ? '#ff0000' : 'rgba(255,255,255,0.2)',
                       }}
                     >
                       <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '4px' }}>
                         #{box.index + 1} {measurement?.name || '（手動入力）'}
                       </div>
                       {box.isOutOfTolerance && (
-          <div style={{ 
-            fontSize: '14px', 
-            color: '#ff6666', 
-            fontWeight: 'bold',
-            marginBottom: '4px' 
-          }}>
-            ⚠️ 許容範囲外
-          </div>
-        )}
+                        <div
+                          style={{
+                            fontSize: '14px',
+                            color: '#ff6666',
+                            fontWeight: 'bold',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          ⚠️ 許容範囲外
+                        </div>
+                      )}
                       <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
                         元の値: {box.value} mm
                       </div>
@@ -1499,43 +1606,37 @@ if (isZeissFormat) {
                       </div>
                     </div>
                   )
-                })()
-              )}
-              
+                })()}
+
               {/* ズーム情報 */}
               {(viewTransform.scale !== 1 || currentBox) && (
                 <div style={styles.zoomInfo}>
                   ズーム: {Math.round(viewTransform.scale * 100)}%
-                  {currentBox && ` | 作成中: ${Math.round(currentBox.width)}×${Math.round(currentBox.height)}px`}
+                  {currentBox &&
+                    ` | 作成中: ${Math.round(currentBox.width)}×${Math.round(currentBox.height)}px`}
                 </div>
               )}
             </div>
           </div>
-          
+
           <div style={styles.panel}>
             <h3>📋 測定結果</h3>
-            {pdfLoadError && (
-              <div style={styles.errorMessage}>
-                ⚠️ {pdfLoadError}
-              </div>
-            )}
+            {pdfLoadError && <div style={styles.errorMessage}>⚠️ {pdfLoadError}</div>}
             <div style={styles.measurementList}>
               {measurements.length === 0 ? (
                 <p style={{ color: '#999' }}>
-                  PDFをアップロードすると測定値が表示されます<br/>
+                  PDFをアップロードすると測定値が表示されます
+                  <br />
                   <small>※Calypso/ZEISS両形式対応</small>
                 </p>
               ) : (
                 measurements.map((m, index) => {
-                  const box = boxes.find(b => b.index === index)
+                  const box = boxes.find((b) => b.index === index)
                   const isAssigned = !!box?.value
                   const isManuallyEdited = box?.isManuallyEdited
-                  
+
                   return (
-                    <div 
-                      key={index} 
-                      style={styles.measurementItem(isAssigned, m.isOutOfTolerance)}
-                    >
+                    <div key={index} style={styles.measurementItem(isAssigned, m.isOutOfTolerance)}>
                       <span style={{ flex: 1 }}>
                         {index + 1}. {m.name}
                         {isManuallyEdited && ' ✏️'}
@@ -1548,66 +1649,118 @@ if (isZeissFormat) {
                 })
               )}
             </div>
-            
-            <div style={{ marginTop: '20px', padding: '10px', background: '#e9ecef', borderRadius: '10px' }}>
+
+            <div
+              style={{
+                marginTop: '20px',
+                padding: '10px',
+                background: '#e9ecef',
+                borderRadius: '10px',
+              }}
+            >
               <p>📊 ステータス</p>
               <div style={{ display: 'flex', gap: '20px', marginTop: '10px', flexWrap: 'wrap' }}>
-                <span>ボックス数: <strong>{boxes.length}</strong></span>
-                <span>測定値数: <strong>{measurements.length}</strong></span>
-                <span>転記済み: <strong>{boxes.filter(b => b.value).length}</strong></span>
-                <span>手動編集: <strong>{boxes.filter(b => b.isManuallyEdited).length}</strong></span>
-                <span style={{ color: measurements.some(m => m.isOutOfTolerance) ? '#ff0000' : 'inherit' }}>
-    許容範囲外: <strong>{measurements.filter(m => m.isOutOfTolerance).length}</strong>
-  </span>
-                <span>ズーム: <strong>{Math.round(viewTransform.scale * 100)}%</strong></span>
-                <span>最小サイズ: <strong>{minBoxSize}px</strong></span>
-                <span>最小フォント: <strong>{minFontSize}px</strong></span>
+                <span>
+                  ボックス数: <strong>{boxes.length}</strong>
+                </span>
+                <span>
+                  測定値数: <strong>{measurements.length}</strong>
+                </span>
+                <span>
+                  転記済み: <strong>{boxes.filter((b) => b.value).length}</strong>
+                </span>
+                <span>
+                  手動編集: <strong>{boxes.filter((b) => b.isManuallyEdited).length}</strong>
+                </span>
+                <span
+                  style={{
+                    color: measurements.some((m) => m.isOutOfTolerance) ? '#ff0000' : 'inherit',
+                  }}
+                >
+                  許容範囲外:{' '}
+                  <strong>{measurements.filter((m) => m.isOutOfTolerance).length}</strong>
+                </span>
+                <span>
+                  ズーム: <strong>{Math.round(viewTransform.scale * 100)}%</strong>
+                </span>
+                <span>
+                  最小サイズ: <strong>{minBoxSize}px</strong>
+                </span>
+                <span>
+                  最小フォント: <strong>{minFontSize}px</strong>
+                </span>
               </div>
               <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
                 💡 <strong>使い方ガイド:</strong>
                 <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
-                  <li><strong>ダブルクリック</strong>: 値を手動編集</li>
-                  <li><strong>右クリック</strong>: 小数点桁数を変更</li>
-                  <li><strong>移動モード + マウスホイール</strong>: ズーム（最大1000倍）</li>
-                  <li><strong>移動モード + ドラッグ</strong>: 画面移動</li>
-                  <li><strong>Calypso/ZEISS形式</strong>: 両方のPDF形式に対応</li>
-                  <li><strong>✏️マーク</strong>: 手動編集されたボックス</li>
+                  <li>
+                    <strong>ダブルクリック</strong>: 値を手動編集
+                  </li>
+                  <li>
+                    <strong>右クリック</strong>: 小数点桁数を変更
+                  </li>
+                  <li>
+                    <strong>移動モード + マウスホイール</strong>: ズーム（最大1000倍）
+                  </li>
+                  <li>
+                    <strong>移動モード + ドラッグ</strong>: 画面移動
+                  </li>
+                  <li>
+                    <strong>Calypso/ZEISS形式</strong>: 両方のPDF形式に対応
+                  </li>
+                  <li>
+                    <strong>✏️マーク</strong>: 手動編集されたボックス
+                  </li>
                 </ul>
               </div>
             </div>
           </div>
         </div>
       </div>
-      
+
       {/* 右クリックメニュー */}
       {contextMenu.visible && (
         <div
           style={{
             ...styles.contextMenu,
             left: `${contextMenu.x}px`,
-            top: `${contextMenu.y}px`
+            top: `${contextMenu.y}px`,
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div style={{ padding: '8px 16px', fontWeight: 'bold', borderBottom: '1px solid #e0e0e0', background: '#f5f5f5' }}>
+          <div
+            style={{
+              padding: '8px 16px',
+              fontWeight: 'bold',
+              borderBottom: '1px solid #e0e0e0',
+              background: '#f5f5f5',
+            }}
+          >
             🔢 ボックス設定
           </div>
-          <div style={{ padding: '8px 16px', fontSize: '13px', color: '#666', borderBottom: '1px solid #e0e0e0' }}>
+          <div
+            style={{
+              padding: '8px 16px',
+              fontSize: '13px',
+              color: '#666',
+              borderBottom: '1px solid #e0e0e0',
+            }}
+          >
             小数点桁数を選択:
           </div>
-          {[0, 1, 2, 3, 4].map(places => {
-            const currentBox = boxes.find(b => b.id === contextMenu.boxId)
+          {[0, 1, 2, 3, 4].map((places) => {
+            const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
             const isCurrentSetting = currentBox?.decimalPlaces === places
-            
+
             return (
               <div
                 key={places}
                 style={{
                   ...styles.contextMenuItem,
                   background: isCurrentSetting ? '#e3f2fd' : 'transparent',
-                  fontWeight: isCurrentSetting ? 'bold' : 'normal'
+                  fontWeight: isCurrentSetting ? 'bold' : 'normal',
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#f0f0f0'}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = isCurrentSetting ? '#e3f2fd' : 'transparent'
                 }}

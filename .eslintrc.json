@@ -1,8 +1,5 @@
 {
-  "extends": [
-    "next/core-web-vitals",
-    "plugin:prettier/recommended"
-  ],
+  "extends": ["next/core-web-vitals", "plugin:prettier/recommended"],
   "rules": {
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/no-explicit-any": "off",
@@ -15,11 +12,5 @@
       }
     ]
   },
-  "ignorePatterns": [
-    "node_modules/",
-    ".next/",
-    "out/",
-    "public/",
-    "*.config.js"
-  ]
+  "ignorePatterns": ["node_modules/", ".next/", "out/", "public/", "*.config.js"]
 }
