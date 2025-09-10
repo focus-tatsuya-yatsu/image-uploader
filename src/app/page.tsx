@@ -15,6 +15,7 @@ interface Box {
   index: number
   decimalPlaces: number
   isManuallyEdited?: boolean
+  isOutOfTolerance?: boolean
 }
 
 interface Measurement {
@@ -398,11 +399,13 @@ const MeasurementPage = () => {
 // page.tsxの1094行目付近の if (isZeissFormat) { ... } ブロックを以下に置き換えてください
 
 if (isZeissFormat) {
-  // ZEISS形式の新しいパターン（改善版）
+  // ZEISSフォーマットの処理
   if (rowItems.length >= 2) {
-    // 測定値を探す（数値パターンにマッチするものを探す）
     let measuredValueIndex = -1
     let measuredValue = null
+    let designValue = null
+    let upperTolerance = null
+    let lowerTolerance = null
     let unitFound = 'mm'
     
     // 数値パターンを持つ要素を探す
@@ -411,23 +414,31 @@ if (isZeissFormat) {
       
       // 測定値のパターン（小数点を含む数値）
       if (/^[-]?\d+\.\d{3,4}$/.test(item)) {
-        measuredValue = item
-        measuredValueIndex = j
-        // 次の要素が単位かチェック
-        if (j + 1 < rowItems.length && rowItems[j + 1] === 'mm') {
-          unitFound = 'mm'
+        // 最初の数値が測定値
+        if (!measuredValue) {
+          measuredValue = item
+          measuredValueIndex = j
+        } 
+        // 2番目の数値が設計値
+        else if (!designValue) {
+          designValue = item
         }
-        break
+        // 3番目の数値が公差(+)
+        else if (!upperTolerance) {
+          upperTolerance = item
+        }
+        // 4番目の数値が公差(-)
+        else if (!lowerTolerance) {
+          lowerTolerance = item
+        }
       }
     }
     
     // 測定値が見つかった場合、名前を構築
     if (measuredValue && measuredValueIndex > 0) {
-      // 測定値より前のすべての要素を結合して名前を作成
-      let nameParts: string[]= []
+      let nameParts: string[] = []
       for (let k = 0; k < measuredValueIndex; k++) {
         const part = rowItems[k].trim()
-        // ヘッダー行や不要な要素を除外
         if (part &&
             part !== '名前' &&
             part !== '測定値' &&
@@ -440,22 +451,7 @@ if (isZeissFormat) {
         }
       }
       
-      // 名前を結合（特殊文字の処理）
       let name = nameParts.join('')
-      
-      // 一般的なZEISS形式のパターンを修正
-      // "X-" "値円1_6H7" -> "X-値円1_6H7"
-      // "平面度" "1" -> "平面度1"
-      if (name.endsWith('-') && nameParts.length > 1) {
-        // ハイフンで終わる場合は次の要素と結合されている可能性が高い
-        name = nameParts.join('')
-      } else if (nameParts.length === 2 && /^[A-Za-z]+-?$/.test(nameParts[0])) {
-        // "X-" や "Y-" のようなパターン
-        name = nameParts.join('')
-      } else if (nameParts.length === 2 && /^\d+$/.test(nameParts[1])) {
-        // "平面度" "1" のようなパターン
-        name = nameParts.join('')
-      }
       
       if (name && measuredValue) {
         const exists = extractedMeasurements.some(m => 
@@ -463,12 +459,28 @@ if (isZeissFormat) {
         )
         
         if (!exists) {
+          // 許容範囲チェック
+          let isOutOfTolerance = false
+          if (designValue && upperTolerance && lowerTolerance) {
+            const measured = parseFloat(measuredValue)
+            const design = parseFloat(designValue)
+            const upper = parseFloat(upperTolerance)
+            const lower = parseFloat(lowerTolerance)
+            
+            if (!isNaN(measured) && !isNaN(design) && !isNaN(upper) && !isNaN(lower)) {
+              const error = measured - design
+              // 公差範囲外かチェック
+              isOutOfTolerance = error > upper || error < lower
+            }
+          }
+          
           extractedMeasurements.push({
             name: name,
             value: measuredValue,
-            unit: unitFound
+            unit: unitFound,
+            isOutOfTolerance: isOutOfTolerance
           })
-          console.log(`ZEISS形式（改善版）: ${name} = ${measuredValue} ${unitFound}`)
+          console.log(`ZEISS形式: ${name} = ${measuredValue} ${unitFound}${isOutOfTolerance ? ' [許容範囲外]' : ''}`)
         }
       }
     }
@@ -476,31 +488,48 @@ if (isZeissFormat) {
 }else {
               // Calypso形式のパターン（既存のまま）
               const calypsoPatterns = [
-                /^(.+?)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+/,
-                /^([A-Za-z_\-]+[\d_]*(?:_[A-Za-z0-9]+)*)\s+([-]?\d+\.\d{4})\s+/,
-                /^(平面度\d*|同心度\d*|真円度[^\s]*|直径[^\s]*)\s+([-]?\d+\.\d{4})\s+/
+                /^(.+?)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s*/,
+                /^([A-Za-z_\-]+[\d_]*(?:_[A-Za-z0-9]+)*)\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s+([-]?\d+\.\d{4})\s*/,
               ]
               
               for (const pattern of calypsoPatterns) {
                 const match = rowText.match(pattern)
                 if (match) {
                   let name = match[1].trim()
-                  .replace(/\s+/g, '')  // 全スペース削除
-                  .replace(/([A-Z])-([A-Z])/g, '$1-$2')
-                  .replace(/([^_])_([^_])/g, '$1_$2')
-                  const value = match[2]
+                    .replace(/\s+/g, '')
+                    .replace(/([A-Z])-([A-Z])/g, '$1-$2')
+                    .replace(/([^_])_([^_])/g, '$1_$2')
+                  const measuredValue = match[2]  // 実測値
+                  const designValue = match[3]     // 基準値
+                  const upperTolerance = match[4]  // 上許容差
+                  const lowerTolerance = match[5]  // 下許容差
+                  
+                  // 許容範囲チェック
+                  let isOutOfTolerance = false
+                  if (measuredValue && designValue && upperTolerance && lowerTolerance) {
+                    const measured = parseFloat(measuredValue)
+                    const design = parseFloat(designValue)
+                    const upper = parseFloat(upperTolerance)
+                    const lower = parseFloat(lowerTolerance)
+                    
+                    if (!isNaN(measured) && !isNaN(design) && !isNaN(upper) && !isNaN(lower)) {
+                      const error = measured - design
+                      isOutOfTolerance = error > upper || error < lower
+                    }
+                  }
                   
                   const exists = extractedMeasurements.some(m => 
-                    m.name === name && m.value === value
+                    m.name === name && m.value === measuredValue
                   )
                   
                   if (!exists && !name.includes('設計値') && !name.includes('公差')) {
                     extractedMeasurements.push({
                       name: name,
-                      value: value,
-                      unit: 'mm'
+                      value: measuredValue,
+                      unit: 'mm',
+                      isOutOfTolerance: isOutOfTolerance
                     })
-                    console.log(`Calypso形式: ${name} = ${value} mm`)
+                    console.log(`Calypso形式: ${name} = ${measuredValue} mm${isOutOfTolerance ? ' [許容範囲外]' : ''}`)
                     break
                   }
                 }
@@ -770,7 +799,8 @@ if (isZeissFormat) {
       if (measurements[index]) {
         return {
           ...box,
-          value: measurements[index].value
+          value: measurements[index].value,
+          isOutOfTolerance: measurements[index].isOutOfTolerance
         }
       }
       return box
@@ -930,18 +960,22 @@ if (isZeissFormat) {
       MozUserDrag: 'none' as const,
       userDrag: 'none' as const
     },
-    box: (isVertical: boolean, fontSize: number, textColor: string, isEditing: boolean, borderWidth: number) => ({
+    box: (isVertical: boolean, fontSize: number, textColor: string, isEditing: boolean, borderWidth: number, isOutOfTolerance?: boolean) => ({
       position: 'absolute' as const,
       border: isEditing 
         ? `${Math.max(2, borderWidth)}px solid #00ff00` 
-        : textColor === 'white' 
-          ? `${borderWidth}px solid #ffffff` 
-          : `${borderWidth}px solid #ff6b6b`,
+        : isOutOfTolerance
+          ? `${Math.max(2, borderWidth)}px solid #ff0000`  // 許容範囲外は赤枠
+          : textColor === 'white' 
+            ? `${borderWidth}px solid #ffffff` 
+            : `${borderWidth}px solid #ff6b6b`,
       background: isEditing
         ? 'rgba(0, 255, 0, 0.1)'
-        : textColor === 'white' 
-          ? 'rgba(0, 0, 0, 0.7)' 
-          : 'rgba(255, 107, 107, 0.1)',
+        : isOutOfTolerance
+          ? 'rgba(255, 0, 0, 0.2)'  // 許容範囲外は赤背景
+          : textColor === 'white' 
+            ? 'rgba(0, 0, 0, 0.7)' 
+            : 'rgba(255, 107, 107, 0.1)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -967,12 +1001,16 @@ if (isZeissFormat) {
       fontFamily: '"Noto Sans JP", sans-serif',
       display: showBoxNumbers ? 'block' : 'none'
     }),
-    boxValue: (textColor: string) => ({
-      fontWeight: 'bold' as const,
-      color: textColor === 'white' ? '#ffffff' : '#333333',
-      padding: '2px',
-      fontFamily: '"Noto Sans JP", sans-serif'
-    }),
+    boxValue: (textColor: string, isOutOfTolerance?: boolean) => ({
+  fontWeight: 'bold' as const,
+  color: isOutOfTolerance 
+    ? '#ff0000'  // 許容範囲外は赤文字
+    : textColor === 'white' 
+      ? '#ffffff' 
+      : '#333333',
+  padding: '2px',
+  fontFamily: '"Noto Sans JP", sans-serif'
+}),
     editInput: {
       position: 'absolute' as const,
       top: '50%',
@@ -1119,7 +1157,7 @@ if (isZeissFormat) {
     <div style={styles.container}>
       <div style={styles.mainContainer}>
         <div style={styles.header}>
-          <h1>📊 図面測定値転記システム (ZEISS対応版)</h1>
+          <h1>📊 図面測定値転記システム</h1>
           <p>CalypsoとZEISS両形式のPDFに対応</p>
         </div>
         
@@ -1309,7 +1347,7 @@ if (isZeissFormat) {
                     <div
                       key={box.id}
                       style={{
-                        ...styles.box(isVertical, fontSize, textColorMode, isEditing, borderWidth),
+                        ...styles.box(isVertical, fontSize, textColorMode, isEditing, borderWidth, box.isOutOfTolerance),
                         left: `${box.x}px`,
                         top: `${box.y}px`,
                         width: `${box.width}px`,
@@ -1354,29 +1392,29 @@ if (isZeissFormat) {
                       </span>
                       
                       {isEditing ? (
-                        <input
-                          ref={editInputRef}
-                          type="text"
-                          value={editingValue}
-                          onChange={(e) => setEditingValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleEditConfirm()
-                            } else if (e.key === 'Escape') {
-                              handleEditCancel()
-                            }
-                          }}
-                          onBlur={handleEditConfirm}
-                          style={styles.editInput}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        box.value && (
-                          <span style={styles.boxValue(textColorMode)}>
-                            {formattedValue}
-                          </span>
-                        )
-                      )}
+        <input
+          ref={editInputRef}
+          type="text"
+          value={editingValue}
+          onChange={(e) => setEditingValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleEditConfirm()
+            } else if (e.key === 'Escape') {
+              handleEditCancel()
+            }
+          }}
+          onBlur={handleEditConfirm}
+          style={styles.editInput}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        box.value && (
+          <span style={styles.boxValue(textColorMode, box.isOutOfTolerance)}>
+            {formattedValue}
+          </span>
+        )
+      )}
                       
                       {!isEditing && (
                         <button
@@ -1433,12 +1471,23 @@ if (isZeissFormat) {
                       style={{
                         ...styles.tooltip,
                         left: `${tooltipPosition.x}px`,
-                        top: `${tooltipPosition.y}px`
+                        top: `${tooltipPosition.y}px`,
+                        borderColor: box.isOutOfTolerance ? '#ff0000' : 'rgba(255,255,255,0.2)'
                       }}
                     >
                       <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '4px' }}>
                         #{box.index + 1} {measurement?.name || '（手動入力）'}
                       </div>
+                      {box.isOutOfTolerance && (
+          <div style={{ 
+            fontSize: '14px', 
+            color: '#ff6666', 
+            fontWeight: 'bold',
+            marginBottom: '4px' 
+          }}>
+            ⚠️ 許容範囲外
+          </div>
+        )}
                       <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
                         元の値: {box.value} mm
                       </div>
@@ -1507,6 +1556,9 @@ if (isZeissFormat) {
                 <span>測定値数: <strong>{measurements.length}</strong></span>
                 <span>転記済み: <strong>{boxes.filter(b => b.value).length}</strong></span>
                 <span>手動編集: <strong>{boxes.filter(b => b.isManuallyEdited).length}</strong></span>
+                <span style={{ color: measurements.some(m => m.isOutOfTolerance) ? '#ff0000' : 'inherit' }}>
+    許容範囲外: <strong>{measurements.filter(m => m.isOutOfTolerance).length}</strong>
+  </span>
                 <span>ズーム: <strong>{Math.round(viewTransform.scale * 100)}%</strong></span>
                 <span>最小サイズ: <strong>{minBoxSize}px</strong></span>
                 <span>最小フォント: <strong>{minFontSize}px</strong></span>
