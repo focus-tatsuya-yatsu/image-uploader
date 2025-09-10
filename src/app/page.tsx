@@ -1135,7 +1135,9 @@ const MeasurementPage = () => {
             isVertical
           )
           ctx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`
-          ctx.fillStyle = textColorMode === 'white' ? '#ffffff' : '#333333'
+          ctx.fillStyle = box.isOutOfTolerance 
+  ? '#ff0000'  // 許容範囲外なら赤色
+  : (textColorMode === 'white' ? '#ffffff' : '#333333')  // そうでなければ通常の色
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           
