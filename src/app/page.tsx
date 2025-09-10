@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import UTIF from 'utif'
+import NextImage from 'next/image'
 
 // 型定義
 interface Box {
@@ -1740,10 +1741,11 @@ const MeasurementPage = () => {
             >
               <div style={styles.transformContainer}>
                 {drawingImage && (
-                  <img
+                  <NextImage
                     src={drawingImage}
-                    style={styles.image}
                     alt="Drawing"
+                    fill
+                    style={{ objectFit: 'contain' }}
                     draggable={false}
                     onDragStart={(e) => e.preventDefault()}
                   />
