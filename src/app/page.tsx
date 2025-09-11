@@ -4,8 +4,6 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import jsPDF from 'jspdf'
 import UTIF from 'utif'
 import NextImage from 'next/image'
-import { display } from 'html2canvas/dist/types/css/property-descriptors/display'
-import { overflow } from 'html2canvas/dist/types/css/property-descriptors/overflow'
 
 // 型定義
 interface Box {
@@ -19,6 +17,11 @@ interface Box {
   decimalPlaces: number
   isManuallyEdited?: boolean
   isOutOfTolerance?: boolean
+}
+
+interface ResizeHandle {
+  position: 'nw' | 'ne' | 'se' | 'sw' | 'n' | 'e' | 's' | 'w'
+  cursor: string
 }
 
 interface Measurement {
@@ -286,6 +289,11 @@ const MeasurementPage = () => {
   const [draggedBoxId, setDraggedBoxId] = useState<number | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [showGuide, setShowGuide] = useState(false) // 使い方ガイドの表示状態
+  const [isResizing, setIsResizing] = useState(false)
+  const [resizingBoxId, setResizingBoxId] = useState<number | null>(null)
+  const [resizeHandle, setResizeHandle] = useState<ResizeHandle['position'] | null>(null)
+  const [resizeStartBox, setResizeStartBox] = useState<Box | null>(null)
+  const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 })
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1081,6 +1089,86 @@ const MeasurementPage = () => {
       return
     }
 
+    // リサイズ処理（handleMouseMoveに追加）
+    if (isResizing && resizingBoxId !== null && resizeHandle && resizeStartBox) {
+      const canvasPos = screenToCanvas(e.clientX, e.clientY)
+      const dx = canvasPos.x - resizeStartPos.x
+      const dy = canvasPos.y - resizeStartPos.y
+
+      setBoxes((prev) =>
+        prev.map((box) => {
+          if (box.id === resizingBoxId) {
+            let newX = resizeStartBox.x
+            let newY = resizeStartBox.y
+            let newWidth = resizeStartBox.width
+            let newHeight = resizeStartBox.height
+
+            // ハンドル位置に応じてリサイズ処理
+            switch (resizeHandle) {
+              case 'nw':
+                newX = resizeStartBox.x + dx
+                newY = resizeStartBox.y + dy
+                newWidth = resizeStartBox.width - dx
+                newHeight = resizeStartBox.height - dy
+                break
+              case 'ne':
+                newY = resizeStartBox.y + dy
+                newWidth = resizeStartBox.width + dx
+                newHeight = resizeStartBox.height - dy
+                break
+              case 'se':
+                newWidth = resizeStartBox.width + dx
+                newHeight = resizeStartBox.height + dy
+                break
+              case 'sw':
+                newX = resizeStartBox.x + dx
+                newWidth = resizeStartBox.width - dx
+                newHeight = resizeStartBox.height + dy
+                break
+              case 'n':
+                newY = resizeStartBox.y + dy
+                newHeight = resizeStartBox.height - dy
+                break
+              case 'e':
+                newWidth = resizeStartBox.width + dx
+                break
+              case 's':
+                newHeight = resizeStartBox.height + dy
+                break
+              case 'w':
+                newX = resizeStartBox.x + dx
+                newWidth = resizeStartBox.width - dx
+                break
+            }
+
+            // 最小サイズの制限
+            if (newWidth < minBoxSize) {
+              newWidth = minBoxSize
+              if (resizeHandle.includes('w')) {
+                newX = resizeStartBox.x + resizeStartBox.width - minBoxSize
+              }
+            }
+            if (newHeight < minBoxSize) {
+              newHeight = minBoxSize
+              if (resizeHandle.includes('n')) {
+                newY = resizeStartBox.y + resizeStartBox.height - minBoxSize
+              }
+            }
+
+            return {
+              ...box,
+              x: newX,
+              y: newY,
+              width: newWidth,
+              height: newHeight,
+            }
+          }
+          return box
+        })
+      )
+      return
+    }
+
     if (isPanning) {
       handlePanMove(e)
       return
@@ -1149,6 +1237,15 @@ const MeasurementPage = () => {
 
   // マウスアップ処理（修正版）
   const handleMouseUp = (e?: React.MouseEvent<HTMLDivElement>) => {
+    // リサイズ終了処理
+    if (isResizing) {
+      setIsResizing(false)
+      setResizingBoxId(null)
+      setResizeHandle(null)
+      setResizeStartBox(null)
+      return
+    }
+
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault()
     }
@@ -1182,6 +1279,27 @@ const MeasurementPage = () => {
 
     setCurrentBox(null)
   }
+
+  // リサイズハンドルのスタイル定義
+  const resizeHandleStyle = (
+    handle: ResizeHandle['position'],
+    handleSize: number,
+    textColor: string
+  ) => ({
+    position: 'absolute' as const,
+    width: `${handleSize}px`,
+    height: `${handleSize}px`,
+    background: textColor === 'white' ? '#ffffff' : '#667eea',
+    border: `1px solid ${textColor === 'white' ? '#000' : '#fff'}`,
+    borderRadius: handle.length === 2 ? '50%' : '2px', // 角は円形、辺は四角
+    cursor: RESIZE_HANDLES.find((h) => h.position === handle)?.cursor || 'default',
+    zIndex: 11,
+    opacity: 0.8,
+    transition: 'opacity 0.2s',
+    '&:hover': {
+      opacity: 1,
+    },
+  })
 
   // 選択的転記機能を追加（個別のボックスに特定の測定値を割り当て）
   const assignSpecificValue = (boxId: number, measurementIndex: number) => {
@@ -1232,6 +1350,65 @@ const MeasurementPage = () => {
   // ビューリセット
   const resetView = () => {
     setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
+  }
+
+  // リサイズハンドルの定義（定数として追加）
+  const RESIZE_HANDLES: ResizeHandle[] = [
+    { position: 'nw', cursor: 'nw-resize' },
+    { position: 'ne', cursor: 'ne-resize' },
+    { position: 'se', cursor: 'se-resize' },
+    { position: 'sw', cursor: 'sw-resize' },
+    { position: 'n', cursor: 'n-resize' },
+    { position: 'e', cursor: 'e-resize' },
+    { position: 's', cursor: 's-resize' },
+    { position: 'w', cursor: 'w-resize' },
+  ]
+
+  // リサイズハンドルの位置計算関数
+  const getHandlePosition = (box: Box, handle: ResizeHandle['position'], handleSize: number) => {
+    const halfSize = handleSize / 2
+
+    switch (handle) {
+      case 'nw':
+        return { x: box.x - halfSize, y: box.y - halfSize }
+      case 'ne':
+        return { x: box.x + box.width - halfSize, y: box.y - halfSize }
+      case 'se':
+        return { x: box.x + box.width - halfSize, y: box.y + box.height - halfSize }
+      case 'sw':
+        return { x: box.x - halfSize, y: box.y + box.height - halfSize }
+      case 'n':
+        return { x: box.x + box.width / 2 - halfSize, y: box.y - halfSize }
+      case 'e':
+        return { x: box.x + box.width - halfSize, y: box.y + box.height / 2 - halfSize }
+      case 's':
+        return { x: box.x + box.width / 2 - halfSize, y: box.y + box.height - halfSize }
+      case 'w':
+        return { x: box.x - halfSize, y: box.y + box.height / 2 - halfSize }
+      default:
+        return { x: 0, y: 0 }
+    }
+  }
+
+  // リサイズ開始処理
+  const handleResizeStart = (
+    e: React.MouseEvent,
+    boxId: number,
+    handle: ResizeHandle['position']
+  ) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const box = boxes.find((b) => b.id === boxId)
+    if (!box) return
+
+    const canvasPos = screenToCanvas(e.clientX, e.clientY)
+
+    setIsResizing(true)
+    setResizingBoxId(boxId)
+    setResizeHandle(handle)
+    setResizeStartBox({ ...box })
+    setResizeStartPos(canvasPos)
   }
 
   // performSave関数を独立して定義
@@ -1560,7 +1737,15 @@ const MeasurementPage = () => {
       border: '2px solid #e9ecef',
       borderRadius: '10px',
       overflow: 'hidden',
-      cursor: drawMode ? 'crosshair' : isPanning ? 'grabbing' : 'grab',
+      cursor: isResizing
+        ? RESIZE_HANDLES.find((h) => h.position === resizeHandle)?.cursor || 'default'
+        : drawMode
+          ? 'crosshair'
+          : isPanning
+            ? 'grabbing'
+            : isDraggingBox
+              ? 'grabbing'
+              : 'grab',
       userSelect: 'none' as const,
       WebkitUserSelect: 'none' as const,
       MozUserSelect: 'none' as const,
@@ -1733,6 +1918,7 @@ const MeasurementPage = () => {
       zIndex: 10,
       fontFamily: '"Noto Sans JP", sans-serif',
     }),
+
     errorMessage: {
       background: '#f8d7da',
       color: '#721c24',
@@ -2201,6 +2387,39 @@ const MeasurementPage = () => {
                           >
                             ×
                           </button>
+                        )}
+                        {/* リサイズハンドル */}
+                        {!drawMode && !editingBoxId && !isDraggingBox && !isPanning && (
+                          <>
+                            {RESIZE_HANDLES.map((handle) => {
+                              const handleSize = getScaledElementSize(8, viewTransform.scale)
+                              const pos = getHandlePosition(box, handle.position, handleSize)
+
+                              return (
+                                <div
+                                  key={handle.position}
+                                  style={{
+                                    ...resizeHandleStyle(
+                                      handle.position,
+                                      handleSize,
+                                      textColorMode
+                                    ),
+                                    left: `${pos.x - box.x}px`,
+                                    top: `${pos.y - box.y}px`,
+                                  }}
+                                  onMouseDown={(e) => handleResizeStart(e, box.id, handle.position)}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.opacity = '1'
+                                    e.currentTarget.style.transform = 'scale(1.2)'
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.opacity = '0.8'
+                                    e.currentTarget.style.transform = 'scale(1)'
+                                  }}
+                                />
+                              )
+                            })}
+                          </>
                         )}
                       </div>
                     )
