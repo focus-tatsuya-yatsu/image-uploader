@@ -546,6 +546,38 @@ const MeasurementPage = () => {
     hideContextMenu()
   }
 
+  // インデックス変更機能を追加
+  const changeBoxIndex = (boxId: number, newIndex: number) => {
+    // 0ベースのインデックスに変換（ユーザー入力は1ベース）
+    const targetIndex = newIndex - 1
+
+    // 負の値や大きすぎる値のチェック
+    if (targetIndex < 0 || targetIndex > 999) {
+      alert('番号は1から1000の間で入力してください')
+      return
+    }
+
+    // 既存のボックスで同じインデックスを持つものがあるかチェック
+    const existingBox = boxes.find((b) => b.index === targetIndex && b.id !== boxId)
+
+    if (existingBox) {
+      if (!confirm(`番号 ${newIndex} は既に使用されています。上書きしますか？`)) {
+        return
+      }
+    }
+
+    setBoxes((prev) =>
+      prev.map((box) => {
+        if (box.id === boxId) {
+          return { ...box, index: targetIndex }
+        }
+        return box
+      })
+    )
+
+    hideContextMenu()
+  }
+
   // すべてのボックスの桁数を一括変更
   const changeAllDecimalPlaces = (decimalPlaces: number) => {
     setBoxes((prev) =>
@@ -1708,6 +1740,10 @@ const MeasurementPage = () => {
       alignItems: 'center',
       fontFamily: '"Noto Sans JP", sans-serif',
     },
+    contextMenuSection: {
+      maxHeight: '300px',
+      overflowY: 'auto' as const,
+    },
     zoomInfo: {
       position: 'absolute' as const,
       bottom: '10px',
@@ -2351,7 +2387,10 @@ const MeasurementPage = () => {
                   <strong>🖱️ ダブルクリック:</strong> 値を手動編集
                 </li>
                 <li style={{ marginBottom: '8px' }}>
-                  <strong>🖱️ 右クリック:</strong> 小数点桁数を変更
+                  <strong>🖱️ 右クリック:</strong> 小数点桁数を変更、番号を変更
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🔢 番号変更:</strong> 右クリック → 任意の番号（1〜1000）を直接指定可能
                 </li>
                 <li style={{ marginBottom: '8px' }}>
                   <strong>🤚 移動モード + マウスホイール:</strong> ズーム（最大1000倍）
@@ -2360,7 +2399,7 @@ const MeasurementPage = () => {
                   <strong>🤚 移動モード + ドラッグ:</strong> 画面移動
                 </li>
                 <li style={{ marginBottom: '8px' }}>
-                  <strong>📄 Calypso/ZEISS形式:</strong> 両方のPDF形式に対応
+                  <strong>🔄 Calypso/ZEISS形式:</strong> 両方のPDF形式に対応
                 </li>
                 <li>
                   <strong>✏️ マーク:</strong> 手動編集されたボックス
@@ -2387,53 +2426,99 @@ const MeasurementPage = () => {
               fontWeight: 'bold',
               borderBottom: '1px solid #e0e0e0',
               background: '#f5f5f5',
+              position: 'sticky',
+              top: 0,
+              zIndex: 1,
             }}
           >
-            🔢 ボックス設定
+            📢 ボックス設定
+          </div>
+
+          {/* 番号変更セクション */}
+          <div
+            style={{
+              ...styles.contextMenuItem,
+              borderBottom: '2px solid #e0e0e0',
+              paddingBottom: '12px',
+              marginBottom: '8px',
+              background: '#fff9e6',
+            }}
+            onClick={() => {
+              const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+              if (currentBox) {
+                const input = prompt(
+                  `新しい番号を入力してください (現在: ${currentBox.index + 1})\n※1〜1000の範囲で入力`,
+                  String(currentBox.index + 1)
+                )
+                if (input) {
+                  const newIndex = parseInt(input)
+                  if (!isNaN(newIndex)) {
+                    changeBoxIndex(currentBox.id, newIndex)
+                  } else {
+                    alert('有効な数字を入力してください')
+                  }
+                }
+              }
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px' }}>🔢</span>
+              <span>番号を変更</span>
+            </span>
+            <span style={{ fontSize: '12px', color: '#666' }}>
+              {(() => {
+                const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                return currentBox ? `現在: ${currentBox.index + 1}` : ''
+              })()}
+            </span>
           </div>
 
           {/* 測定値の選択セクション */}
-          <div
-            style={{
-              padding: '8px 16px',
-              fontSize: '13px',
-              color: '#666',
-              borderBottom: '1px solid #e0e0e0',
-              background: '#fafafa',
-            }}
-          >
-            測定値を選択:
-          </div>
-          {measurements.slice(0, 10).map((m, idx) => {
-            const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-            const isCurrentValue = currentBox?.value === m.value
+          <div style={styles.contextMenuSection}>
+            <div
+              style={{
+                padding: '8px 16px',
+                fontSize: '13px',
+                color: '#666',
+                borderBottom: '1px solid #e0e0e0',
+                background: '#fafafa',
+                position: 'sticky',
+                top: 0,
+              }}
+            >
+              測定値を選択: ({measurements.length}個)
+            </div>
+            {measurements.map((m, idx) => {
+              const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+              const isCurrentValue = currentBox?.value === m.value
 
-            return (
-              <div
-                key={idx}
-                style={{
-                  ...styles.contextMenuItem,
-                  background: isCurrentValue ? '#e3f2fd' : 'transparent',
-                  fontSize: '13px',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = isCurrentValue ? '#e3f2fd' : 'transparent'
-                }}
-                onClick={() => {
-                  if (contextMenu.boxId) {
-                    assignSpecificValue(contextMenu.boxId, idx)
-                    hideContextMenu()
-                  }
-                }}
-              >
-                <span>
-                  #{idx + 1}: {m.name.length > 15 ? m.name.substring(0, 15) + '...' : m.name}
-                </span>
-                <span style={{ fontSize: '12px', color: '#666' }}>{m.value}</span>
-              </div>
-            )
-          })}
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    ...styles.contextMenuItem,
+                    background: isCurrentValue ? '#e3f2fd' : 'transparent',
+                    fontSize: '13px',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = isCurrentValue ? '#e3f2fd' : 'transparent'
+                  }}
+                  onClick={() => {
+                    if (contextMenu.boxId) {
+                      assignSpecificValue(contextMenu.boxId, idx)
+                      hideContextMenu()
+                    }
+                  }}
+                >
+                  <span>
+                    #{idx + 1}: {m.name.length > 15 ? m.name.substring(0, 15) + '...' : m.name}
+                  </span>
+                  <span style={{ fontSize: '12px', color: '#666' }}>{m.value}</span>
+                </div>
+              )
+            })}
+          </div>
 
           <div
             style={{
@@ -2449,6 +2534,7 @@ const MeasurementPage = () => {
               fontSize: '13px',
               color: '#666',
               borderBottom: '1px solid #e0e0e0',
+              background: '#fafafa',
             }}
           >
             小数点桁数を選択:
