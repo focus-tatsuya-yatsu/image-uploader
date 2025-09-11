@@ -505,15 +505,43 @@ const MeasurementPage = () => {
     setIsPanning(false)
   }
 
-  // 右クリックメニュー表示
+  // 右クリックメニュー表示（位置自動調整機能付き）
   const handleContextMenu = (e: React.MouseEvent, boxId: number) => {
     e.preventDefault()
     e.stopPropagation()
 
+    // メニューの推定サイズ
+    const menuHeight = 600 // メニューの推定高さ
+    const menuWidth = 250 // メニューの推定幅
+
+    // ウィンドウのサイズを取得
+    const windowHeight = window.innerHeight
+    const windowWidth = window.innerWidth
+
+    // クリック位置
+    let x = e.clientX
+    let y = e.clientY
+
+    // 右端チェック
+    if (x + menuWidth > windowWidth) {
+      x = windowWidth - menuWidth - 10 // 右端から10px余白
+    }
+
+    // 下端チェック - メニューが画面外に出る場合は上に表示
+    if (y + menuHeight > windowHeight) {
+      // メニューを上に表示（クリック位置の上にメニューの下端が来るように）
+      y = Math.max(10, y - menuHeight + 100) // 最低でも上から10pxの位置
+    }
+
+    // 上端チェック
+    if (y < 10) {
+      y = 10
+    }
+
     setContextMenu({
       visible: true,
-      x: e.clientX,
-      y: e.clientY,
+      x,
+      y,
       boxId,
     })
   }
@@ -1728,6 +1756,10 @@ const MeasurementPage = () => {
       padding: '8px 0',
       zIndex: 2000,
       minWidth: '200px',
+      maxWidth: '300px',
+      maxHeight: '80vh', // 画面の80%までの高さに制限
+      overflowY: 'auto' as const, // スクロール可能に
+      overflowX: 'hidden' as const,
     },
     contextMenuItem: {
       padding: '8px 16px',
@@ -1741,8 +1773,11 @@ const MeasurementPage = () => {
       fontFamily: '"Noto Sans JP", sans-serif',
     },
     contextMenuSection: {
-      maxHeight: '300px',
+      maxHeight: '250px', // セクションごとの高さ制限
       overflowY: 'auto' as const,
+      overflowX: 'hidden' as const,
+      borderTop: '1px solid #e0e0e0',
+      borderBottom: '1px solid #e0e0e0',
     },
     zoomInfo: {
       position: 'absolute' as const,
