@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 import UTIF from 'utif'
 import NextImage from 'next/image'
 
@@ -58,7 +57,7 @@ const SaveDialog: React.FC<{
       const now = new Date()
       const dateStr = now.toISOString().slice(0, 10)
       const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
-      return `測定結果_${dateStr}_${timeStr}`
+      return `図面_${dateStr}_${timeStr}`
     }
 
     return (
@@ -253,7 +252,6 @@ const MeasurementPage = () => {
   const [currentBox, setCurrentBox] = useState<Box | null>(null)
   const [startPos, setStartPos] = useState({ x: 0, y: 0 })
   const [drawMode, setDrawMode] = useState(true)
-  const [selectedBox, setSelectedBox] = useState<number | null>(null)
   const [pdfLoaded, setPdfLoaded] = useState(false)
   const [pdfLoadError, setPdfLoadError] = useState<string | null>(null)
   const [hoveredBox, setHoveredBox] = useState<number | null>(null)
@@ -283,6 +281,9 @@ const MeasurementPage = () => {
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [saveFileName, setSaveFileName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isDraggingBox, setIsDraggingBox] = useState(false)
+  const [draggedBoxId, setDraggedBoxId] = useState<number | null>(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -957,6 +958,27 @@ const MeasurementPage = () => {
     })
   }
 
+  // ボックスのドラッグ開始処理
+  const handleBoxMouseDown = (e: React.MouseEvent, boxId: number) => {
+    e.stopPropagation()
+
+    if (!drawMode && e.button === 0 && !e.ctrlKey) {
+      // 移動モードでボックスをクリックした場合
+      const box = boxes.find((b) => b.id === boxId)
+      if (!box) return
+
+      const canvasPos = screenToCanvas(e.clientX, e.clientY)
+
+      // ドラッグ開始
+      setIsDraggingBox(true)
+      setDraggedBoxId(boxId)
+      setDragOffset({
+        x: canvasPos.x - box.x,
+        y: canvasPos.y - box.y,
+      })
+    }
+  }
+
   // マウス移動処理
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!e || typeof e.preventDefault !== 'function') {
@@ -964,6 +986,30 @@ const MeasurementPage = () => {
     }
 
     e.preventDefault()
+
+    // ボックスのドラッグ処理を追加
+    if (isDraggingBox && draggedBoxId !== null) {
+      const canvasPos = screenToCanvas(e.clientX, e.clientY)
+
+      setBoxes((prev) =>
+        prev.map((box) => {
+          if (box.id === draggedBoxId) {
+            return {
+              ...box,
+              x: canvasPos.x - dragOffset.x,
+              y: canvasPos.y - dragOffset.y,
+            }
+          }
+          return box
+        })
+      )
+      return
+    }
+
+    if (isPanning) {
+      handlePanMove(e)
+      return
+    }
 
     if (isPanning) {
       handlePanMove(e)
@@ -1030,6 +1076,14 @@ const MeasurementPage = () => {
   const handleMouseUp = (e?: React.MouseEvent<HTMLDivElement>) => {
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault()
+    }
+
+    // ボックスのドラッグ終了
+    if (isDraggingBox) {
+      setIsDraggingBox(false)
+      setDraggedBoxId(null)
+      setDragOffset({ x: 0, y: 0 })
+      return
     }
 
     if (isPanning) {
@@ -1362,7 +1416,8 @@ const MeasurementPage = () => {
       isEditing: boolean,
       borderWidth: number,
       isOutOfTolerance?: boolean,
-      boxSize?: number
+      boxSize?: number,
+      isDragging?: boolean
     ) => {
       // ボックスサイズに応じて背景の透明度を調整
       const getBackgroundAlpha = () => {
@@ -1385,27 +1440,37 @@ const MeasurementPage = () => {
         position: 'absolute' as const,
         border: isEditing
           ? `${Math.max(2, borderWidth)}px solid #00ff00`
-          : isOutOfTolerance
-            ? `${borderWidth}px solid #ff0000` // 許容範囲外は赤枠
-            : textColor === 'white'
-              ? `${borderWidth}px solid #ffffff`
-              : `${borderWidth}px solid #ff6b6b`,
+          : isDragging
+            ? `${Math.max(2, borderWidth)}px solid #0066ff` // ドラッグ中は青枠
+            : isOutOfTolerance
+              ? `${borderWidth}px solid #ff0000` // 許容範囲外は赤枠
+              : textColor === 'white'
+                ? `${borderWidth}px solid #ffffff`
+                : `${borderWidth}px solid #ff6b6b`,
         background: isEditing
           ? 'rgba(0, 255, 0, 0.1)'
-          : isOutOfTolerance
-            ? `rgba(255, 0, 0, ${getBackgroundAlpha()})` // 動的な透明度
-            : textColor === 'white'
-              ? `rgba(0, 0, 0, ${getBackgroundAlpha()})`
-              : `rgba(255, 107, 107, ${getBackgroundAlpha()})`,
+          : isDragging
+            ? 'rgba(0, 102, 255, 0.2)' // ドラッグ中は青背景
+            : isOutOfTolerance
+              ? `rgba(255, 0, 0, ${getBackgroundAlpha()})` // 動的な透明度
+              : textColor === 'white'
+                ? `rgba(0, 0, 0, ${getBackgroundAlpha()})`
+                : `rgba(255, 107, 107, ${getBackgroundAlpha()})`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        cursor: drawMode ? 'default' : 'move',
+        cursor: drawMode
+          ? 'default'
+          : isDragging
+            ? 'grabbing' // ドラッグ中
+            : 'grab', // ドラッグ可能
         writingMode: isVertical ? ('vertical-rl' as const) : ('horizontal-tb' as const),
         textOrientation: isVertical ? ('upright' as const) : ('mixed' as const),
         userSelect: 'none' as const,
         fontSize: `${fontSize}px`,
         fontFamily: '"Noto Sans JP", sans-serif',
+        transition: isDragging ? 'none' : 'box-shadow 0.2s', // ドラッグ中はトランジション無効
+        boxShadow: isDragging ? '0 4px 8px rgba(0,0,0,0.3)' : 'none', // ドラッグ中に影を追加
       }
     },
     boxNumber: (textColor: string, scaledSize: number) => ({
@@ -1781,18 +1846,19 @@ const MeasurementPage = () => {
                           isEditing,
                           borderWidth,
                           box.isOutOfTolerance,
-                          minBoxDimension
+                          minBoxDimension,
+                          draggedBoxId === box.id
                         ),
                         left: `${box.x}px`,
                         top: `${box.y}px`,
                         width: `${box.width}px`,
                         height: `${box.height}px`,
                       }}
-                      onMouseDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => handleBoxMouseDown(e, box.id)}
                       onContextMenu={(e) => handleContextMenu(e, box.id)}
                       onDoubleClick={() => handleBoxDoubleClick(box)}
                       onMouseEnter={(e) => {
-                        if (box.value && !isEditing) {
+                        if (box.value && !isEditing && !isDraggingBox) {
                           setHoveredBox(box.id)
                           if (canvasRef.current) {
                             const rect = canvasRef.current.getBoundingClientRect()
