@@ -838,6 +838,22 @@ const MeasurementPage = () => {
     }, 100)
   }
 
+  // 空いている最小の番号を取得する関数を追加
+const getNextAvailableIndex = (boxes: Box[]): number => {
+  // 現在使用中のインデックスを取得
+  const usedIndices = boxes.map(box => box.index).sort((a, b) => a - b)
+  
+  // 0から順番に空いている番号を探す
+  for (let i = 0; i < usedIndices.length; i++) {
+    if (usedIndices[i] !== i) {
+      return i // 空いている番号を返す
+    }
+  }
+  
+  // すべて連番の場合は次の番号を返す
+  return usedIndices.length
+}
+
   // 図面アップロード処理
   const handleDrawingUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -943,6 +959,7 @@ const MeasurementPage = () => {
     if (!drawingImage || !canvasRef.current) return
 
     const canvasPos = screenToCanvas(e.clientX, e.clientY)
+    const newIndex = getNextAvailableIndex(boxes)  // 事前に番号を取得
 
     setIsDrawing(true)
     setStartPos(canvasPos)
@@ -953,7 +970,7 @@ const MeasurementPage = () => {
       width: 0,
       height: 0,
       value: null,
-      index: boxes.length,
+      index: newIndex,  // boxes.lengthではなく、空いている番号を使用
       decimalPlaces: defaultDecimalPlaces,
     })
   }
@@ -1096,23 +1113,48 @@ const MeasurementPage = () => {
     setIsDrawing(false)
 
     if (currentBox.width > minBoxSize && currentBox.height > minBoxSize) {
-      setBoxes((prev) => [...prev, currentBox])
+      // 空いている最小の番号を取得して設定
+    const newIndex = getNextAvailableIndex(boxes)
+    const newBox = {
+      ...currentBox,
+      index: newIndex  // boxes.lengthではなく、空いている番号を使用
+    }
+      setBoxes((prev) => [...prev, newBox])
     }
 
     setCurrentBox(null)
   }
 
+  // 選択的転記機能を追加（個別のボックスに特定の測定値を割り当て）
+const assignSpecificValue = (boxId: number, measurementIndex: number) => {
+  setBoxes(prev => prev.map(box => {
+    if (box.id === boxId && measurements[measurementIndex]) {
+      return {
+        ...box,
+        value: measurements[measurementIndex].value,
+        isOutOfTolerance: measurements[measurementIndex].isOutOfTolerance,
+        isManuallyEdited: false // 自動転記フラグをリセット
+      }
+    }
+    return box
+  }))
+}
+
   // 測定値自動転記
   const autoAssignValues = () => {
-    const updatedBoxes = boxes.map((box, index) => {
+    const updatedBoxes = boxes.map((box) => {
       if (box.isManuallyEdited) {
         return box
       }
-      if (measurements[index]) {
+      // box.indexに対応する測定値を正確に取得
+    // indexは0ベースなので、測定値配列の対応する位置から取得
+    const measurementIndex = box.index
+
+      if (measurements[measurementIndex]) {
         return {
           ...box,
-          value: measurements[index].value,
-          isOutOfTolerance: measurements[index].isOutOfTolerance,
+          value: measurements[measurementIndex].value,
+          isOutOfTolerance: measurements[measurementIndex].isOutOfTolerance,
         }
       }
       return box
@@ -1305,6 +1347,35 @@ const MeasurementPage = () => {
     const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
     setSaveFileName(`測定結果_${dateStr}_${timeStr}`)
   }
+
+  // ボックス番号を再採番する機能（オプション）
+const renumberBoxes = () => {
+  if (!confirm('番号を整理しますか？\n※測定値との対応関係がリセットされます')) {
+    return
+  }
+  
+  setBoxes((prev) => {
+    // 現在のindex順でソート
+    const sorted = [...prev].sort((a, b) => a.index - b.index)
+    
+    // 値のマッピングを保持（必要な場合）
+    const valueMapping = new Map()
+    sorted.forEach((box, newIndex) => {
+      if (box.value && !box.isManuallyEdited) {
+        valueMapping.set(newIndex, box.value)
+      }
+    })
+    
+    // 0から順番に番号を振り直す
+    return sorted.map((box, newIndex) => ({
+      ...box,
+      index: newIndex,
+      // 番号整理時に値を維持するかどうか選択可能
+      value: box.isManuallyEdited ? box.value : null,
+      isOutOfTolerance: box.isManuallyEdited ? box.isOutOfTolerance : false
+    }))
+  })
+}
 
   // ボックス削除
   const deleteBox = (boxId: number) => {
@@ -1720,6 +1791,14 @@ const MeasurementPage = () => {
             🔄 表示リセット
           </button>
 
+          <button 
+  style={styles.actionBtn(false)} 
+  onClick={renumberBoxes}
+  title="ボックス番号を連番に整理"
+>
+  🔢 番号整理
+</button>
+
           <button style={styles.actionBtn(false)} onClick={exportResult}>
             💾 結果を保存
           </button>
@@ -2044,19 +2123,31 @@ const MeasurementPage = () => {
               ) : (
                 measurements.map((m, index) => {
                   const box = boxes.find((b) => b.index === index)
-                  const isAssigned = !!box?.value
-                  const isManuallyEdited = box?.isManuallyEdited
+  const isAssigned = !!box?.value
+  const isManuallyEdited = box?.isManuallyEdited
 
-                  return (
-                    <div key={index} style={styles.measurementItem(isAssigned, m.isOutOfTolerance)}>
-                      <span style={{ flex: 1 }}>
-                        {index + 1}. {m.name}
-                        {isManuallyEdited && ' ✏️'}
-                      </span>
-                      <strong style={{ color: m.isOutOfTolerance ? '#dc3545' : 'inherit' }}>
-                        {m.value} {m.unit}
-                      </strong>
-                    </div>
+  return (
+    <div key={index} style={styles.measurementItem(isAssigned, m.isOutOfTolerance)}>
+      <span style={{ flex: 1 }}>
+        <strong style={{ marginRight: '8px', color: '#666' }}>
+          #{index + 1}
+        </strong>
+        {m.name}
+        {isManuallyEdited && ' ✏️'}
+        {box && (
+          <span style={{ 
+            fontSize: '11px', 
+            color: '#888',
+            marginLeft: '8px'
+          }}>
+            → Box {box.index + 1}
+          </span>
+        )}
+      </span>
+      <strong style={{ color: m.isOutOfTolerance ? '#dc3545' : 'inherit' }}>
+        {m.value} {m.unit}
+      </strong>
+    </div>
                   )
                 })
               )}
@@ -2072,9 +2163,14 @@ const MeasurementPage = () => {
             >
               <p>📊 ステータス</p>
               <div style={{ display: 'flex', gap: '20px', marginTop: '10px', flexWrap: 'wrap' }}>
-                <span>
-                  ボックス数: <strong>{boxes.length}</strong>
-                </span>
+              <span>
+  ボックス数: <strong>{boxes.length}</strong>
+  {boxes.length > 0 && (
+    <span style={{ fontSize: '12px', marginLeft: '5px', color: '#666' }}>
+      (番号: {boxes.map(b => b.index + 1).sort((a, b) => a - b).join(', ')})
+    </span>
+  )}
+</span>
                 <span>
                   測定値数: <strong>{measurements.length}</strong>
                 </span>
@@ -2150,6 +2246,60 @@ const MeasurementPage = () => {
           >
             🔢 ボックス設定
           </div>
+
+              {/* 測定値の選択セクション */}
+              <div
+      style={{
+        padding: '8px 16px',
+        fontSize: '13px',
+        color: '#666',
+        borderBottom: '1px solid #e0e0e0',
+        background: '#fafafa',
+      }}
+    >
+      測定値を選択:
+    </div>
+    {measurements.slice(0, 10).map((m, idx) => {
+      const currentBox = boxes.find(b => b.id === contextMenu.boxId)
+      const isCurrentValue = currentBox?.value === m.value
+      
+      return (
+        <div
+          key={idx}
+          style={{
+            ...styles.contextMenuItem,
+            background: isCurrentValue ? '#e3f2fd' : 'transparent',
+            fontSize: '13px',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = isCurrentValue ? '#e3f2fd' : 'transparent'
+          }}
+          onClick={() => {
+            if (contextMenu.boxId) {
+              assignSpecificValue(contextMenu.boxId, idx)
+              hideContextMenu()
+            }
+          }}
+        >
+          <span>
+            #{idx + 1}: {m.name.length > 15 ? m.name.substring(0, 15) + '...' : m.name}
+          </span>
+          <span style={{ fontSize: '12px', color: '#666' }}>
+            {m.value}
+          </span>
+        </div>
+      )
+    })}
+    
+    <div
+      style={{
+        borderTop: '1px solid #e0e0e0',
+        marginTop: '4px',
+        paddingTop: '4px',
+      }}
+    />
+  {/* 既存の小数点設定 */}
           <div
             style={{
               padding: '8px 16px',
