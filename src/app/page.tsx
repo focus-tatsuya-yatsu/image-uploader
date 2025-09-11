@@ -40,7 +40,7 @@ interface ViewTransform {
   translateY: number
 }
 
-// SaveDialogコンポーネント（MeasurementPageの外に定義してカーソル問題を解決）
+// SaveDialogコンポーネント
 const SaveDialog: React.FC<{
   showSaveDialog: boolean
   setShowSaveDialog: (show: boolean) => void
@@ -52,7 +52,6 @@ const SaveDialog: React.FC<{
   ({ showSaveDialog, setShowSaveDialog, saveFileName, setSaveFileName, isSaving, performSave }) => {
     if (!showSaveDialog) return null
 
-    // デフォルトファイル名を生成
     const getDefaultFileName = () => {
       const now = new Date()
       const dateStr = now.toISOString().slice(0, 10)
@@ -284,6 +283,7 @@ const MeasurementPage = () => {
   const [isDraggingBox, setIsDraggingBox] = useState(false)
   const [draggedBoxId, setDraggedBoxId] = useState<number | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [showGuide, setShowGuide] = useState(false) // 使い方ガイドの表示状態
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -348,10 +348,9 @@ const MeasurementPage = () => {
   const calculateBorderWidth = (boxWidth: number, boxHeight: number, scale: number): number => {
     const minSize = Math.min(boxWidth, boxHeight)
 
-    // サイズに応じた基本線幅をより細かく調整
     let baseWidth: number
     if (minSize < 10) {
-      baseWidth = 0 // 非常に小さいボックスは0.5px
+      baseWidth = 0
     } else if (minSize < 20) {
       baseWidth = 0.8
     } else if (minSize < 30) {
@@ -362,10 +361,8 @@ const MeasurementPage = () => {
       baseWidth = 2
     }
 
-    // ズームレベルによる調整（ズームアウト時は線を太く）
     const scaledWidth = scale < 1 ? baseWidth / scale : baseWidth / Math.max(1, scale / 2)
 
-    // 最小値0.3px、最大値3px
     return Math.max(0, Math.min(3, scaledWidth))
   }
 
@@ -431,7 +428,6 @@ const MeasurementPage = () => {
     const availableWidth = boxWidth - padding * 2
     const availableHeight = boxHeight - padding * 2
 
-    // 非常に小さいボックスの場合の特別処理
     if (Math.min(boxWidth, boxHeight) < 15) {
       return Math.max(1, Math.min(availableHeight * 0.6, availableWidth * 0.8))
     }
@@ -648,7 +644,7 @@ const MeasurementPage = () => {
 
             // ZEISS形式のPDF処理部分の修正版
             if (isZeissFormat) {
-              // ZEISSフォーマットの処理
+              // ZEISS形式の処理
               if (rowItems.length >= 2) {
                 let measuredValueIndex = -1
                 let measuredValue = null
@@ -1384,69 +1380,112 @@ const MeasurementPage = () => {
     setBoxes((prev) => prev.filter((box) => box.id !== boxId))
   }
 
-  // スタイル定義
+  // スタイル定義（改善版）
   const styles = {
     container: {
       fontFamily:
         '"Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       minHeight: '100vh',
-      padding: '20px',
+      padding: '10px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     mainContainer: {
-      maxWidth: '1400px',
-      margin: '0 auto',
+      width: '100%',
+      maxWidth: '1600px',
+      height: 'calc(100vh - 20px)',
       background: 'white',
       borderRadius: '20px',
       boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
+      display: 'flex',
+      flexDirection: 'column' as const,
       overflow: 'hidden',
     },
     header: {
       background: 'linear-gradient(135deg, #DDDDDD 10%, #888888 100%)',
       color: 'white',
-      padding: '20px',
+      padding: '15px 20px',
       textAlign: 'center' as const,
-      position: 'relative' as const,
+      flexShrink: 0,
     },
     controls: {
-      padding: '20px',
+      padding: '15px 20px',
       background: '#f8f9fa',
       borderBottom: '2px solid #e9ecef',
       display: 'flex',
-      gap: '15px',
+      gap: '10px',
       flexWrap: 'wrap' as const,
       alignItems: 'center',
+      justifyContent: 'space-between',
+      flexShrink: 0,
+    },
+    controlsLeft: {
+      display: 'flex',
+      gap: '10px',
+      flexWrap: 'wrap' as const,
+      alignItems: 'center',
+      flex: 1,
+    },
+    autoAssignButton: {
+      padding: '12px 30px',
+      fontSize: '16px',
+      fontWeight: 'bold' as const,
+      background:
+        pdfLoaded && boxes.length > 0
+          ? 'linear-gradient(135deg, #28a745 0%, #20c997 100%)'
+          : '#999',
+      color: 'white',
+      border: 'none',
+      borderRadius: '25px',
+      cursor: pdfLoaded && boxes.length > 0 ? 'pointer' : 'not-allowed',
+      boxShadow: pdfLoaded && boxes.length > 0 ? '0 4px 15px rgba(40, 167, 69, 0.4)' : 'none',
+      transition: 'all 0.3s',
+      fontFamily: '"Noto Sans JP", sans-serif',
+      marginLeft: 'auto',
+      flexShrink: 0,
     },
     uploadBtn: {
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       color: 'white',
       border: 'none',
-      padding: '10px 20px',
-      borderRadius: '25px',
+      padding: '8px 16px',
+      borderRadius: '20px',
       cursor: 'pointer',
       fontWeight: '600',
       fontFamily: '"Noto Sans JP", sans-serif',
+      fontSize: '14px',
     },
     actionBtn: (active: boolean) => ({
-      padding: '8px 16px',
-      borderRadius: '20px',
+      padding: '6px 14px',
+      borderRadius: '15px',
       border: '2px solid #667eea',
       background: active ? '#667eea' : 'white',
       color: active ? 'white' : '#667eea',
       cursor: 'pointer',
       fontWeight: '600',
       fontFamily: '"Noto Sans JP", sans-serif',
+      fontSize: '13px',
     }),
+    // スクロール可能なメインコンテンツ
+    scrollableContent: {
+      flex: 1,
+      overflowY: 'auto' as const,
+      overflowX: 'hidden' as const,
+    },
     mainContent: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
       gap: '20px',
       padding: '20px',
+      minHeight: 'min-content',
     },
     panel: {
       background: '#f8f9fa',
       borderRadius: '15px',
       padding: '20px',
+      height: 'fit-content',
     },
     canvasContainer: {
       position: 'relative' as const,
@@ -1684,10 +1723,60 @@ const MeasurementPage = () => {
     decimalControl: {
       display: 'flex',
       alignItems: 'center',
-      gap: '10px',
-      padding: '5px 10px',
+      gap: '8px',
+      padding: '4px 8px',
       background: '#f0f0f0',
-      borderRadius: '15px',
+      borderRadius: '12px',
+      fontSize: '13px',
+    },
+    // 固定ステータスバー
+    statusBar: {
+      padding: '15px 20px',
+      background: '#e9ecef',
+      borderTop: '2px solid #dee2e6',
+      flexShrink: 0,
+    },
+    statusContent: {
+      display: 'flex',
+      gap: '20px',
+      flexWrap: 'wrap' as const,
+      alignItems: 'center',
+      fontSize: '14px',
+      fontFamily: '"Noto Sans JP", sans-serif',
+    },
+    statusItem: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '5px',
+    },
+    // 使い方ガイドのスタイル
+    guideSection: {
+      background: '#fafafa',
+      borderTop: '1px solid #dee2e6',
+      flexShrink: 0,
+    },
+    guideToggle: {
+      width: '100%',
+      padding: '12px 20px',
+      background: '#fafafa',
+      border: 'none',
+      borderTop: '1px solid #e9ecef',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      fontSize: '14px',
+      fontWeight: 'bold' as const,
+      color: '#333',
+      fontFamily: '"Noto Sans JP", sans-serif',
+      transition: 'background 0.2s',
+    },
+    guideContent: {
+      padding: '20px',
+      background: '#f0f8ff',
+      fontSize: '13px',
+      color: '#555',
+      borderTop: '1px solid #dee2e6',
+      animation: 'slideDown 0.3s ease',
     },
   }
 
@@ -1718,518 +1807,567 @@ const MeasurementPage = () => {
     <div style={styles.container}>
       <div style={styles.mainContainer}>
         <div style={styles.header}>
-          <h1>📊 図面測定値転記システム</h1>
-          <p>CalypsoとZEISS両形式のPDFに対応</p>
+          <h1 style={{ margin: '0', fontSize: '24px' }}>📊 図面測定値転記システム</h1>
+          <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>CalypsoとZEISS両形式のPDFに対応</p>
         </div>
 
         <div style={styles.controls}>
-          <label>
-            <input
-              type="file"
-              accept="image/*,.tif,.tiff"
-              onChange={handleDrawingUpload}
-              style={{ display: 'none' }}
-              ref={fileInputRef}
-            />
-            <button style={styles.uploadBtn} onClick={() => fileInputRef.current?.click()}>
-              📐 図面をアップロード
+          <div style={styles.controlsLeft}>
+            <label>
+              <input
+                type="file"
+                accept="image/*,.tif,.tiff"
+                onChange={handleDrawingUpload}
+                style={{ display: 'none' }}
+                ref={fileInputRef}
+              />
+              <button style={styles.uploadBtn} onClick={() => fileInputRef.current?.click()}>
+                🖼 図面をアップロード
+              </button>
+            </label>
+
+            <label>
+              <input
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={handlePdfUpload}
+                style={{ display: 'none' }}
+                ref={pdfInputRef}
+              />
+              <button style={styles.uploadBtn} onClick={() => pdfInputRef.current?.click()}>
+                📄 測定結果PDFをアップロード
+              </button>
+            </label>
+
+            <button style={styles.actionBtn(drawMode)} onClick={() => setDrawMode(!drawMode)}>
+              {drawMode ? '✏️ 描画モード' : '🤚 移動・編集モード'}
             </button>
-          </label>
 
-          <label>
-            <input
-              type="file"
-              accept=".pdf,application/pdf"
-              onChange={handlePdfUpload}
-              style={{ display: 'none' }}
-              ref={pdfInputRef}
-            />
-            <button style={styles.uploadBtn} onClick={() => pdfInputRef.current?.click()}>
-              📄 測定結果PDFをアップロード
+            <button
+              style={styles.actionBtn(showBoxNumbers)}
+              onClick={() => setShowBoxNumbers(!showBoxNumbers)}
+              title="ボックス番号の表示/非表示"
+            >
+              {showBoxNumbers ? '🔢 番号表示' : '🔢 番号非表示'}
             </button>
-          </label>
 
-          <button style={styles.actionBtn(drawMode)} onClick={() => setDrawMode(!drawMode)}>
-            {drawMode ? '✏️ 描画モード' : '🤚 移動・編集モード'}
-          </button>
+            <button
+              style={styles.actionBtn(showDeleteButtons)}
+              onClick={() => setShowDeleteButtons(!showDeleteButtons)}
+              title="削除ボタンの表示/非表示"
+            >
+              {showDeleteButtons ? '❌ 削除ボタン表示' : '❌ 削除ボタン非表示'}
+            </button>
 
+            <button style={styles.actionBtn(false)} onClick={clearBoxes}>
+              🗑️ ボックスをクリア
+            </button>
+
+            <button
+              style={styles.actionBtn(textColorMode === 'white')}
+              onClick={() => setTextColorMode((prev) => (prev === 'black' ? 'white' : 'black'))}
+              title="文字色を切り替え"
+            >
+              {textColorMode === 'black' ? '⚫' : '⚪'} 文字色
+            </button>
+
+            <button style={styles.actionBtn(false)} onClick={resetView}>
+              🔄 表示リセット
+            </button>
+
+            <button
+              style={styles.actionBtn(false)}
+              onClick={renumberBoxes}
+              title="ボックス番号を連番に整理"
+            >
+              🔢 番号整理
+            </button>
+
+            <button style={styles.actionBtn(false)} onClick={exportResult}>
+              💾 結果を保存
+            </button>
+
+            <div style={styles.decimalControl}>
+              <span>デフォルト桁数:</span>
+              <input
+                type="number"
+                min="0"
+                max="4"
+                value={defaultDecimalPlaces}
+                onChange={(e) => setDefaultDecimalPlaces(parseInt(e.target.value) || 0)}
+                style={{
+                  width: '40px',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                }}
+              />
+              <button
+                onClick={() => changeAllDecimalPlaces(defaultDecimalPlaces)}
+                style={{
+                  padding: '2px 6px',
+                  background: '#667eea',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+              >
+                一括適用
+              </button>
+            </div>
+
+            <div style={styles.decimalControl}>
+              <span>最小BOX:</span>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={minBoxSize}
+                onChange={(e) => setMinBoxSize(parseInt(e.target.value) || 3)}
+                style={{
+                  width: '40px',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                }}
+              />
+              <span>px</span>
+            </div>
+
+            <div style={styles.decimalControl}>
+              <span>最小フォント:</span>
+              <input
+                type="number"
+                min="1"
+                max="6"
+                value={minFontSize}
+                onChange={(e) => setMinFontSize(parseInt(e.target.value) || 1)}
+                style={{
+                  width: '40px',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                }}
+              />
+              <span>px</span>
+            </div>
+          </div>
+
+          {/* 自動転記ボタンを右端に配置 */}
           <button
-            style={styles.actionBtn(showBoxNumbers)}
-            onClick={() => setShowBoxNumbers(!showBoxNumbers)}
-            title="ボックス番号の表示/非表示"
-          >
-            {showBoxNumbers ? '🔢 番号表示' : '🔢 番号非表示'}
-          </button>
-
-          <button
-            style={styles.actionBtn(showDeleteButtons)}
-            onClick={() => setShowDeleteButtons(!showDeleteButtons)}
-            title="削除ボタンの表示/非表示"
-          >
-            {showDeleteButtons ? '❌ 削除ボタン表示' : '❌ 削除ボタン非表示'}
-          </button>
-
-          <button style={styles.actionBtn(false)} onClick={clearBoxes}>
-            🗑️ ボックスをクリア
-          </button>
-
-          <button
-            style={styles.actionBtn(false)}
+            style={styles.autoAssignButton}
             onClick={autoAssignValues}
             disabled={!pdfLoaded || boxes.length === 0}
+            onMouseEnter={(e) => {
+              if (pdfLoaded && boxes.length > 0) {
+                e.currentTarget.style.transform = 'scale(1.05)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(40, 167, 69, 0.5)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(40, 167, 69, 0.4)'
+            }}
           >
             🔄 測定値を自動転記
           </button>
-
-          <button
-            style={styles.actionBtn(textColorMode === 'white')}
-            onClick={() => setTextColorMode((prev) => (prev === 'black' ? 'white' : 'black'))}
-            title="文字色を切り替え"
-          >
-            {textColorMode === 'black' ? '⚫' : '⚪'} 文字色
-          </button>
-
-          <button style={styles.actionBtn(false)} onClick={resetView}>
-            🔄 表示リセット
-          </button>
-
-          <button
-            style={styles.actionBtn(false)}
-            onClick={renumberBoxes}
-            title="ボックス番号を連番に整理"
-          >
-            🔢 番号整理
-          </button>
-
-          <button style={styles.actionBtn(false)} onClick={exportResult}>
-            💾 結果を保存
-          </button>
-
-          <div style={styles.decimalControl}>
-            <span>デフォルト桁数:</span>
-            <input
-              type="number"
-              min="0"
-              max="4"
-              value={defaultDecimalPlaces}
-              onChange={(e) => setDefaultDecimalPlaces(parseInt(e.target.value) || 0)}
-              style={{
-                width: '50px',
-                padding: '2px 5px',
-                borderRadius: '5px',
-                border: '1px solid #ccc',
-              }}
-            />
-            <button
-              onClick={() => changeAllDecimalPlaces(defaultDecimalPlaces)}
-              style={{
-                padding: '2px 8px',
-                background: '#667eea',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontSize: '12px',
-              }}
-            >
-              一括適用
-            </button>
-          </div>
-
-          <div style={styles.decimalControl}>
-            <span>最小ボックス:</span>
-            <input
-              type="number"
-              min="1"
-              max="20"
-              value={minBoxSize}
-              onChange={(e) => setMinBoxSize(parseInt(e.target.value) || 3)}
-              style={{
-                width: '50px',
-                padding: '2px 5px',
-                borderRadius: '5px',
-                border: '1px solid #ccc',
-              }}
-            />
-            <span>px</span>
-          </div>
-
-          <div style={styles.decimalControl}>
-            <span>最小フォント:</span>
-            <input
-              type="number"
-              min="1"
-              max="6"
-              value={minFontSize}
-              onChange={(e) => setMinFontSize(parseInt(e.target.value) || 1)}
-              style={{
-                width: '50px',
-                padding: '2px 5px',
-                borderRadius: '5px',
-                border: '1px solid #ccc',
-              }}
-            />
-            <span>px</span>
-          </div>
         </div>
 
-        <div style={styles.mainContent}>
-          <div style={styles.panel}>
-            <h3>図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
-            <div
-              ref={canvasRef}
-              style={styles.canvasContainer}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={() => handleMouseUp()}
-              onDragStart={(e) => e.preventDefault()}
-            >
-              <div style={styles.transformContainer}>
-                {drawingImage && (
-                  <NextImage
-                    src={drawingImage}
-                    alt="Drawing"
-                    fill
-                    style={{ objectFit: 'contain' }}
-                    draggable={false}
-                    onDragStart={(e) => e.preventDefault()}
-                  />
-                )}
+        {/* スクロール可能なメインコンテンツ */}
+        <div style={styles.scrollableContent}>
+          <div style={styles.mainContent}>
+            <div style={styles.panel}>
+              <h3>図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
+              <div
+                ref={canvasRef}
+                style={styles.canvasContainer}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={() => handleMouseUp()}
+                onDragStart={(e) => e.preventDefault()}
+              >
+                <div style={styles.transformContainer}>
+                  {drawingImage && (
+                    <NextImage
+                      src={drawingImage}
+                      alt="Drawing"
+                      fill
+                      style={{ objectFit: 'contain' }}
+                      draggable={false}
+                      onDragStart={(e) => e.preventDefault()}
+                    />
+                  )}
 
-                {/* 作成済みボックス */}
-                {boxes.map((box) => {
-                  const isVertical = box.height > box.width * 1.5
-                  const formattedValue = formatValue(box.value, box.decimalPlaces)
-                  const fontSize = box.value
-                    ? calculateOptimalFontSize(formattedValue, box.width, box.height, isVertical)
-                    : 14
-                  const isEditing = editingBoxId === box.id
+                  {/* 作成済みボックス */}
+                  {boxes.map((box) => {
+                    const isVertical = box.height > box.width * 1.5
+                    const formattedValue = formatValue(box.value, box.decimalPlaces)
+                    const fontSize = box.value
+                      ? calculateOptimalFontSize(formattedValue, box.width, box.height, isVertical)
+                      : 14
+                    const isEditing = editingBoxId === box.id
 
-                  const borderWidth = calculateBorderWidth(
-                    box.width,
-                    box.height,
-                    viewTransform.scale
-                  )
-                  const scaledNumberSize = getScaledElementSize(14, viewTransform.scale)
-                  const scaledDeleteBtnSize = getScaledElementSize(16, viewTransform.scale)
-                  // ボックスの最小サイズを計算
-                  const minBoxDimension = Math.min(box.width, box.height)
+                    const borderWidth = calculateBorderWidth(
+                      box.width,
+                      box.height,
+                      viewTransform.scale
+                    )
+                    const scaledNumberSize = getScaledElementSize(14, viewTransform.scale)
+                    const scaledDeleteBtnSize = getScaledElementSize(16, viewTransform.scale)
+                    // ボックスの最小サイズを計算
+                    const minBoxDimension = Math.min(box.width, box.height)
 
-                  return (
-                    <div
-                      key={box.id}
-                      style={{
-                        ...styles.box(
-                          isVertical,
-                          fontSize,
-                          textColorMode,
-                          isEditing,
-                          borderWidth,
-                          box.isOutOfTolerance,
-                          minBoxDimension,
-                          draggedBoxId === box.id
-                        ),
-                        left: `${box.x}px`,
-                        top: `${box.y}px`,
-                        width: `${box.width}px`,
-                        height: `${box.height}px`,
-                      }}
-                      onMouseDown={(e) => handleBoxMouseDown(e, box.id)}
-                      onContextMenu={(e) => handleContextMenu(e, box.id)}
-                      onDoubleClick={() => handleBoxDoubleClick(box)}
-                      onMouseEnter={(e) => {
-                        if (box.value && !isEditing && !isDraggingBox) {
-                          setHoveredBox(box.id)
-                          if (canvasRef.current) {
-                            const rect = canvasRef.current.getBoundingClientRect()
-                            const boxRect = e.currentTarget.getBoundingClientRect()
-                            const x =
-                              (boxRect.left - rect.left + box.width / 2) * viewTransform.scale
-                            const y = (boxRect.top - rect.top) * viewTransform.scale
+                    return (
+                      <div
+                        key={box.id}
+                        style={{
+                          ...styles.box(
+                            isVertical,
+                            fontSize,
+                            textColorMode,
+                            isEditing,
+                            borderWidth,
+                            box.isOutOfTolerance,
+                            minBoxDimension,
+                            draggedBoxId === box.id
+                          ),
+                          left: `${box.x}px`,
+                          top: `${box.y}px`,
+                          width: `${box.width}px`,
+                          height: `${box.height}px`,
+                        }}
+                        onMouseDown={(e) => handleBoxMouseDown(e, box.id)}
+                        onContextMenu={(e) => handleContextMenu(e, box.id)}
+                        onDoubleClick={() => handleBoxDoubleClick(box)}
+                        onMouseEnter={(e) => {
+                          if (box.value && !isEditing && !isDraggingBox) {
+                            setHoveredBox(box.id)
+                            if (canvasRef.current) {
+                              const rect = canvasRef.current.getBoundingClientRect()
+                              const boxRect = e.currentTarget.getBoundingClientRect()
+                              const x =
+                                (boxRect.left - rect.left + box.width / 2) * viewTransform.scale
+                              const y = (boxRect.top - rect.top) * viewTransform.scale
 
-                            const tooltipWidth = 200
-                            const tooltipHeight = 80
-                            const padding = 10
+                              const tooltipWidth = 200
+                              const tooltipHeight = 80
+                              const padding = 10
 
-                            let tooltipX = x - tooltipWidth / 2
-                            let tooltipY = y - tooltipHeight - padding
+                              let tooltipX = x - tooltipWidth / 2
+                              let tooltipY = y - tooltipHeight - padding
 
-                            if (tooltipX < 0) tooltipX = padding
-                            if (tooltipX + tooltipWidth > rect.width) {
-                              tooltipX = rect.width - tooltipWidth - padding
+                              if (tooltipX < 0) tooltipX = padding
+                              if (tooltipX + tooltipWidth > rect.width) {
+                                tooltipX = rect.width - tooltipWidth - padding
+                              }
+                              if (tooltipY < 0) {
+                                tooltipY = y + box.height * viewTransform.scale + padding
+                              }
+
+                              setTooltipPosition({ x: tooltipX, y: tooltipY })
                             }
-                            if (tooltipY < 0) {
-                              tooltipY = y + box.height * viewTransform.scale + padding
-                            }
-
-                            setTooltipPosition({ x: tooltipX, y: tooltipY })
                           }
-                        }
-                      }}
-                      onMouseLeave={() => setHoveredBox(null)}
-                    >
-                      <span style={styles.boxNumber(textColorMode, scaledNumberSize)}>
-                        {box.index + 1}
-                        {box.isManuallyEdited && ' ✏️'}
-                      </span>
-                      {/* 値の表示部分 */}
-                      {isEditing ? (
-                        <input
-                          ref={editInputRef}
-                          type="text"
-                          value={editingValue}
-                          onChange={(e) => setEditingValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleEditConfirm()
-                            } else if (e.key === 'Escape') {
-                              handleEditCancel()
-                            }
-                          }}
-                          onBlur={handleEditConfirm}
-                          style={styles.editInput}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        box.value && (
-                          <span
-                            style={{
-                              ...styles.boxValue(textColorMode, box.isOutOfTolerance),
-                              // 小さいボックスでも見やすくするための追加スタイル
-                              textShadow:
-                                box.isOutOfTolerance && minBoxDimension < 50
-                                  ? '0 0 2px white, 0 0 4px white' // 白い縁取りで文字を読みやすく
-                                  : 'none',
+                        }}
+                        onMouseLeave={() => setHoveredBox(null)}
+                      >
+                        <span style={styles.boxNumber(textColorMode, scaledNumberSize)}>
+                          {box.index + 1}
+                          {box.isManuallyEdited && ' ✏️'}
+                        </span>
+                        {/* 値の表示部分 */}
+                        {isEditing ? (
+                          <input
+                            ref={editInputRef}
+                            type="text"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleEditConfirm()
+                              } else if (e.key === 'Escape') {
+                                handleEditCancel()
+                              }
+                            }}
+                            onBlur={handleEditConfirm}
+                            style={styles.editInput}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          box.value && (
+                            <span
+                              style={{
+                                ...styles.boxValue(textColorMode, box.isOutOfTolerance),
+                                // 小さいボックスでも見やすくするための追加スタイル
+                                textShadow:
+                                  box.isOutOfTolerance && minBoxDimension < 50
+                                    ? '0 0 2px white, 0 0 4px white' // 白い縁取りで文字を読みやすく
+                                    : 'none',
+                              }}
+                            >
+                              {formattedValue}
+                            </span>
+                          )
+                        )}
+
+                        {!isEditing && (
+                          <button
+                            style={styles.deleteBtn(textColorMode, scaledDeleteBtnSize)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteBox(box.id)
                             }}
                           >
-                            {formattedValue}
-                          </span>
-                        )
-                      )}
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
 
-                      {!isEditing && (
-                        <button
-                          style={styles.deleteBtn(textColorMode, scaledDeleteBtnSize)}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            deleteBox(box.id)
-                          }}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  )
-                })}
-
-                {/* 描画中のボックス */}
-                {currentBox && (
-                  <div
-                    style={{
-                      ...styles.box(
-                        currentBox.height > currentBox.width * 1.5,
-                        14,
-                        textColorMode,
-                        false,
-                        calculateBorderWidth(
-                          currentBox.width,
-                          currentBox.height,
-                          viewTransform.scale
-                        )
-                      ),
-                      left: `${currentBox.x}px`,
-                      top: `${currentBox.y}px`,
-                      width: `${currentBox.width}px`,
-                      height: `${currentBox.height}px`,
-                      opacity: 0.5,
-                    }}
-                  >
-                    <span
+                  {/* 描画中のボックス */}
+                  {currentBox && (
+                    <div
                       style={{
-                        fontSize: `${getScaledElementSize(10, viewTransform.scale)}px`,
-                        opacity: 0.7,
+                        ...styles.box(
+                          currentBox.height > currentBox.width * 1.5,
+                          14,
+                          textColorMode,
+                          false,
+                          calculateBorderWidth(
+                            currentBox.width,
+                            currentBox.height,
+                            viewTransform.scale
+                          )
+                        ),
+                        left: `${currentBox.x}px`,
+                        top: `${currentBox.y}px`,
+                        width: `${currentBox.width}px`,
+                        height: `${currentBox.height}px`,
+                        opacity: 0.5,
                       }}
                     >
-                      {Math.round(currentBox.width)}×{Math.round(currentBox.height)}px
-                    </span>
+                      <span
+                        style={{
+                          fontSize: `${getScaledElementSize(10, viewTransform.scale)}px`,
+                          opacity: 0.7,
+                        }}
+                      >
+                        {Math.round(currentBox.width)}×{Math.round(currentBox.height)}px
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* ツールチップ */}
+                {hoveredBox !== null &&
+                  (() => {
+                    const box = boxes.find((b) => b.id === hoveredBox)
+                    if (!box || !box.value) return null
+                    const measurement = measurements[box.index]
+
+                    return (
+                      <div
+                        style={{
+                          ...styles.tooltip,
+                          left: `${tooltipPosition.x}px`,
+                          top: `${tooltipPosition.y}px`,
+                          borderColor: box.isOutOfTolerance ? '#ff0000' : 'rgba(255,255,255,0.2)',
+                        }}
+                      >
+                        <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '4px' }}>
+                          #{box.index + 1} {measurement?.name || '（手動入力）'}
+                        </div>
+                        {box.isOutOfTolerance && (
+                          <div
+                            style={{
+                              fontSize: '14px',
+                              color: '#ff6666',
+                              fontWeight: 'bold',
+                              marginBottom: '4px',
+                            }}
+                          >
+                            ⚠️ 許容範囲外
+                          </div>
+                        )}
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
+                          元の値: {box.value} mm
+                        </div>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#00ff00' }}>
+                          表示値: {formatValue(box.value, box.decimalPlaces)} mm
+                        </div>
+                        <div style={{ fontSize: '11px', opacity: 0.7, marginTop: '4px' }}>
+                          小数点: {box.decimalPlaces}桁 {box.isManuallyEdited && '(手動編集済み)'}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                {/* ズーム情報 */}
+                {(viewTransform.scale !== 1 || currentBox) && (
+                  <div style={styles.zoomInfo}>
+                    ズーム: {Math.round(viewTransform.scale * 100)}%
+                    {currentBox &&
+                      ` | 作成中: ${Math.round(currentBox.width)}×${Math.round(currentBox.height)}px`}
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* ツールチップ */}
-              {hoveredBox !== null &&
-                (() => {
-                  const box = boxes.find((b) => b.id === hoveredBox)
-                  if (!box || !box.value) return null
-                  const measurement = measurements[box.index]
+            <div style={styles.panel}>
+              <h3>📋 測定結果</h3>
+              {pdfLoadError && <div style={styles.errorMessage}>⚠️ {pdfLoadError}</div>}
+              <div style={styles.measurementList}>
+                {measurements.length === 0 ? (
+                  <p style={{ color: '#999' }}>
+                    PDFをアップロードすると測定値が表示されます
+                    <br />
+                    <small>※Calypso/ZEISS両形式対応</small>
+                  </p>
+                ) : (
+                  measurements.map((m, index) => {
+                    const box = boxes.find((b) => b.index === index)
+                    const isAssigned = !!box?.value
+                    const isManuallyEdited = box?.isManuallyEdited
 
-                  return (
-                    <div
-                      style={{
-                        ...styles.tooltip,
-                        left: `${tooltipPosition.x}px`,
-                        top: `${tooltipPosition.y}px`,
-                        borderColor: box.isOutOfTolerance ? '#ff0000' : 'rgba(255,255,255,0.2)',
-                      }}
-                    >
-                      <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '4px' }}>
-                        #{box.index + 1} {measurement?.name || '（手動入力）'}
+                    return (
+                      <div
+                        key={index}
+                        style={styles.measurementItem(isAssigned, m.isOutOfTolerance)}
+                      >
+                        <span style={{ flex: 1 }}>
+                          <strong style={{ marginRight: '8px', color: '#666' }}>
+                            #{index + 1}
+                          </strong>
+                          {m.name}
+                          {isManuallyEdited && ' ✏️'}
+                          {box && (
+                            <span
+                              style={{
+                                fontSize: '11px',
+                                color: '#888',
+                                marginLeft: '8px',
+                              }}
+                            >
+                              → Box {box.index + 1}
+                            </span>
+                          )}
+                        </span>
+                        <strong style={{ color: m.isOutOfTolerance ? '#dc3545' : 'inherit' }}>
+                          {m.value} {m.unit}
+                        </strong>
                       </div>
-                      {box.isOutOfTolerance && (
-                        <div
-                          style={{
-                            fontSize: '14px',
-                            color: '#ff6666',
-                            fontWeight: 'bold',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          ⚠️ 許容範囲外
-                        </div>
-                      )}
-                      <div style={{ fontSize: '16px', fontWeight: 'bold' }}>
-                        元の値: {box.value} mm
-                      </div>
-                      <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#00ff00' }}>
-                        表示値: {formatValue(box.value, box.decimalPlaces)} mm
-                      </div>
-                      <div style={{ fontSize: '11px', opacity: 0.7, marginTop: '4px' }}>
-                        小数点: {box.decimalPlaces}桁 {box.isManuallyEdited && '(手動編集済み)'}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-              {/* ズーム情報 */}
-              {(viewTransform.scale !== 1 || currentBox) && (
-                <div style={styles.zoomInfo}>
-                  ズーム: {Math.round(viewTransform.scale * 100)}%
-                  {currentBox &&
-                    ` | 作成中: ${Math.round(currentBox.width)}×${Math.round(currentBox.height)}px`}
-                </div>
-              )}
+                    )
+                  })
+                )}
+              </div>
             </div>
           </div>
+        </div>
 
-          <div style={styles.panel}>
-            <h3>📋 測定結果</h3>
-            {pdfLoadError && <div style={styles.errorMessage}>⚠️ {pdfLoadError}</div>}
-            <div style={styles.measurementList}>
-              {measurements.length === 0 ? (
-                <p style={{ color: '#999' }}>
-                  PDFをアップロードすると測定値が表示されます
-                  <br />
-                  <small>※Calypso/ZEISS両形式対応</small>
-                </p>
-              ) : (
-                measurements.map((m, index) => {
-                  const box = boxes.find((b) => b.index === index)
-                  const isAssigned = !!box?.value
-                  const isManuallyEdited = box?.isManuallyEdited
-
-                  return (
-                    <div key={index} style={styles.measurementItem(isAssigned, m.isOutOfTolerance)}>
-                      <span style={{ flex: 1 }}>
-                        <strong style={{ marginRight: '8px', color: '#666' }}>#{index + 1}</strong>
-                        {m.name}
-                        {isManuallyEdited && ' ✏️'}
-                        {box && (
-                          <span
-                            style={{
-                              fontSize: '11px',
-                              color: '#888',
-                              marginLeft: '8px',
-                            }}
-                          >
-                            → Box {box.index + 1}
-                          </span>
-                        )}
-                      </span>
-                      <strong style={{ color: m.isOutOfTolerance ? '#dc3545' : 'inherit' }}>
-                        {m.value} {m.unit}
-                      </strong>
-                    </div>
+        {/* ステータスバー（最下部に固定） */}
+        <div style={styles.statusBar}>
+          <div style={styles.statusContent}>
+            <div style={styles.statusItem}>
+              <span>ボックス数:</span>
+              <strong>{boxes.length}</strong>
+              {boxes.length > 0 && (
+                <span style={{ fontSize: '11px', color: '#666' }}>
+                  (番号:{' '}
+                  {boxes
+                    .map((b) => b.index + 1)
+                    .sort((a, b) => a - b)
+                    .join(', ')}
                   )
-                })
+                </span>
               )}
             </div>
-
+            <div style={styles.statusItem}>
+              <span>測定値数:</span>
+              <strong>{measurements.length}</strong>
+            </div>
+            <div style={styles.statusItem}>
+              <span>転記済み:</span>
+              <strong>{boxes.filter((b) => b.value).length}</strong>
+            </div>
+            <div style={styles.statusItem}>
+              <span>手動編集:</span>
+              <strong>{boxes.filter((b) => b.isManuallyEdited).length}</strong>
+            </div>
             <div
               style={{
-                marginTop: '20px',
-                padding: '10px',
-                background: '#e9ecef',
-                borderRadius: '10px',
+                ...styles.statusItem,
+                color: measurements.some((m) => m.isOutOfTolerance) ? '#ff0000' : 'inherit',
               }}
             >
-              <p>📊 ステータス</p>
-              <div style={{ display: 'flex', gap: '20px', marginTop: '10px', flexWrap: 'wrap' }}>
-                <span>
-                  ボックス数: <strong>{boxes.length}</strong>
-                  {boxes.length > 0 && (
-                    <span style={{ fontSize: '12px', marginLeft: '5px', color: '#666' }}>
-                      (番号:{' '}
-                      {boxes
-                        .map((b) => b.index + 1)
-                        .sort((a, b) => a - b)
-                        .join(', ')}
-                      )
-                    </span>
-                  )}
-                </span>
-                <span>
-                  測定値数: <strong>{measurements.length}</strong>
-                </span>
-                <span>
-                  転記済み: <strong>{boxes.filter((b) => b.value).length}</strong>
-                </span>
-                <span>
-                  手動編集: <strong>{boxes.filter((b) => b.isManuallyEdited).length}</strong>
-                </span>
-                <span
-                  style={{
-                    color: measurements.some((m) => m.isOutOfTolerance) ? '#ff0000' : 'inherit',
-                  }}
-                >
-                  許容範囲外:{' '}
-                  <strong>{measurements.filter((m) => m.isOutOfTolerance).length}</strong>
-                </span>
-                <span>
-                  ズーム: <strong>{Math.round(viewTransform.scale * 100)}%</strong>
-                </span>
-                <span>
-                  最小サイズ: <strong>{minBoxSize}px</strong>
-                </span>
-                <span>
-                  最小フォント: <strong>{minFontSize}px</strong>
-                </span>
-              </div>
-              <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
-                💡 <strong>使い方ガイド:</strong>
-                <ul style={{ marginTop: '5px', paddingLeft: '20px' }}>
-                  <li>
-                    <strong>ダブルクリック</strong>: 値を手動編集
-                  </li>
-                  <li>
-                    <strong>右クリック</strong>: 小数点桁数を変更
-                  </li>
-                  <li>
-                    <strong>移動モード + マウスホイール</strong>: ズーム（最大1000倍）
-                  </li>
-                  <li>
-                    <strong>移動モード + ドラッグ</strong>: 画面移動
-                  </li>
-                  <li>
-                    <strong>Calypso/ZEISS形式</strong>: 両方のPDF形式に対応
-                  </li>
-                  <li>
-                    <strong>✏️マーク</strong>: 手動編集されたボックス
-                  </li>
-                </ul>
-              </div>
+              <span>許容範囲外:</span>
+              <strong>{measurements.filter((m) => m.isOutOfTolerance).length}</strong>
+            </div>
+            <div style={styles.statusItem}>
+              <span>ズーム:</span>
+              <strong>{Math.round(viewTransform.scale * 100)}%</strong>
+            </div>
+            <div style={styles.statusItem}>
+              <span>最小サイズ:</span>
+              <strong>{minBoxSize}px</strong>
+            </div>
+            <div style={styles.statusItem}>
+              <span>最小フォント:</span>
+              <strong>{minFontSize}px</strong>
             </div>
           </div>
+        </div>
+
+        {/* 使い方ガイド（折りたたみ可能） */}
+        <div style={styles.guideSection}>
+          <button
+            style={styles.guideToggle}
+            onClick={() => setShowGuide(!showGuide)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f5f5f5'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#fafafa'
+            }}
+          >
+            <span style={{ marginRight: '10px' }}>💡</span>
+            <span style={{ flex: 1, textAlign: 'left' }}>使い方ガイド</span>
+            <span
+              style={{
+                transform: showGuide ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.3s',
+                display: 'inline-block',
+              }}
+            >
+              ▼
+            </span>
+          </button>
+          {showGuide && (
+            <div style={styles.guideContent}>
+              <ul style={{ margin: '0', paddingLeft: '20px', listStyle: 'none' }}>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🖱️ ダブルクリック:</strong> 値を手動編集
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🖱️ 右クリック:</strong> 小数点桁数を変更
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🤚 移動モード + マウスホイール:</strong> ズーム（最大1000倍）
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🤚 移動モード + ドラッグ:</strong> 画面移動
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>📄 Calypso/ZEISS形式:</strong> 両方のPDF形式に対応
+                </li>
+                <li>
+                  <strong>✏️ マーク:</strong> 手動編集されたボックス
+                </li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 
