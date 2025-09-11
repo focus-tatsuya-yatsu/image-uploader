@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import jsPDF from 'jspdf'
 import UTIF from 'utif'
 import NextImage from 'next/image'
+import { display } from 'html2canvas/dist/types/css/property-descriptors/display'
+import { overflow } from 'html2canvas/dist/types/css/property-descriptors/overflow'
 
 // 型定義
 interface Box {
@@ -1537,15 +1539,18 @@ const MeasurementPage = () => {
     mainContent: {
       display: 'grid',
       gridTemplateColumns: '1fr 1fr',
+      gridTemplateRows: '1fr',
       gap: '20px',
       padding: '20px',
-      minHeight: 'min-content',
+      height: '100%',
     },
     panel: {
       background: '#f8f9fa',
       borderRadius: '15px',
       padding: '20px',
-      height: 'fit-content',
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column' as const,
     },
     canvasContainer: {
       position: 'relative' as const,
@@ -1690,8 +1695,11 @@ const MeasurementPage = () => {
       border: '2px solid #e9ecef',
       borderRadius: '10px',
       padding: '15px',
-      maxHeight: '400px',
+      // flex: 1, // 親要素の残りスペースを全て使用
       overflowY: 'auto' as const,
+      maxHeight: '500px',
+      // height: '100%',
+      // boxSizing: 'border-box' as const,
     },
     measurementItem: (assigned: boolean, outOfTolerance?: boolean) => ({
       padding: '8px',
