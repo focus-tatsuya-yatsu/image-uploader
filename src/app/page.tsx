@@ -314,12 +314,14 @@ const MeasurementPage = () => {
   const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 })
   const [tempFontSize, setTempFontSize] = useState<number | null>(null)
   const [isSliderDragging, setIsSliderDragging] = useState(false)
+  const [hasCheckedAutoSave, setHasCheckedAutoSave] = useState(false)
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
   const workStateInputRef = useRef<HTMLInputElement>(null)
+  const isAutoSaveLoaded = useRef(false) // 重複実行防止用のフラグ
 
   // PDF.jsの動的インポート
   useEffect(() => {
@@ -2377,6 +2379,12 @@ const MeasurementPage = () => {
 
   // ページ読み込み時の自動復元（useEffect内に追加）
   useEffect(() => {
+    const hasLoadedThisSession = sessionStorage.getItem('measurementApp_sessionLoaded')
+
+    if (hasLoadedThisSession) {
+      return // 既にこのセッションで読み込み済み
+    }
+
     const loadAutoSave = () => {
       try {
         const saved = localStorage.getItem('measurementApp_autoSave')
@@ -2386,14 +2394,16 @@ const MeasurementPage = () => {
           const now = new Date()
           const hoursDiff = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60)
 
-          // 24時間以内の自動保存データがあれば復元するか確認
           if (hoursDiff < 24) {
+            // セッションフラグを設定
+            sessionStorage.setItem('measurementApp_sessionLoaded', 'true')
+
             if (
               confirm(
                 `前回の作業状態が見つかりました。\n（${savedDate.toLocaleString('ja-JP')}）\n\n復元しますか？`
               )
             ) {
-              // 状態を復元
+              // 復元処理（同じ）
               setDrawingImage(saveData.drawingImage)
               setBoxes(saveData.boxes || [])
               setMeasurements(saveData.measurements || [])
@@ -2419,7 +2429,6 @@ const MeasurementPage = () => {
       }
     }
 
-    // 初回のみ実行
     loadAutoSave()
   }, [])
 
@@ -3070,6 +3079,15 @@ const MeasurementPage = () => {
                 </li>
                 <li>
                   <strong>✏️ マーク:</strong> 手動編集されたボックス
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>💾 作業状態の保存:</strong> 図面とボックスを保存して後で再開可能
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>📂 作業状態の読み込み:</strong> 保存した作業を復元
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🔄 自動保存:</strong> 1分ごとに自動でブラウザに保存
                 </li>
               </ul>
             </div>
