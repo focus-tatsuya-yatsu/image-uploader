@@ -1519,9 +1519,12 @@ const MeasurementPage = () => {
 
             // 文字を一つずつ縦に配置
             const chars = formattedValue.split('')
-            const charHeight = box.height / chars.length
+            const charSpacing = fontSize * 1.2 // フォントサイズの1.2倍の間隔
+            const totalHeight = charSpacing * chars.length
+            const startY = -totalHeight / 2 + charSpacing / 2
+
             chars.forEach((char, i) => {
-              const y = -box.height / 2 + charHeight * (i + 0.5)
+              const y = startY + charSpacing * i
               ctx.fillText(char, 0, y)
             })
 
