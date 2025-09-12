@@ -46,6 +46,23 @@ interface ViewTransform {
   translateY: number
 }
 
+interface SaveData {
+  version: string // バージョン管理用
+  savedAt: string // 保存日時
+  drawingImage: string | null // 図面画像
+  boxes: Box[] // ボックス情報
+  measurements: Measurement[] // 測定値（あれば）
+  viewTransform: ViewTransform // ビューの状態
+  settings: {
+    defaultDecimalPlaces: number
+    minBoxSize: number
+    minFontSize: number
+    textColorMode: 'black' | 'white'
+    showBoxNumbers: boolean
+    showDeleteButtons: boolean
+  }
+}
+
 // SaveDialogコンポーネント
 const SaveDialog: React.FC<{
   showSaveDialog: boolean
@@ -302,6 +319,7 @@ const MeasurementPage = () => {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pdfInputRef = useRef<HTMLInputElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
+  const workStateInputRef = useRef<HTMLInputElement>(null)
 
   // PDF.jsの動的インポート
   useEffect(() => {
@@ -1651,6 +1669,104 @@ const MeasurementPage = () => {
     setBoxes((prev) => prev.filter((box) => box.id !== boxId))
   }
 
+  // 2. 作業状態を保存する関数
+  const exportWorkState = () => {
+    const saveData: SaveData = {
+      version: '1.0.0',
+      savedAt: new Date().toISOString(),
+      drawingImage,
+      boxes,
+      measurements,
+      viewTransform,
+      settings: {
+        defaultDecimalPlaces,
+        minBoxSize,
+        minFontSize,
+        textColorMode,
+        showBoxNumbers,
+        showDeleteButtons,
+      },
+    }
+
+    // JSONファイルとしてダウンロード
+    const dataStr = JSON.stringify(saveData, null, 2)
+    const dataBlob = new Blob([dataStr], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+
+    const link = document.createElement('a')
+    link.href = url
+
+    // ファイル名を自動生成
+    const now = new Date()
+    const dateStr = now.toISOString().slice(0, 10)
+    const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
+    link.download = `作業状態_${dateStr}_${timeStr}.json`
+
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    alert('✅ 作業状態を保存しました！\n後で「作業状態を読み込む」から再開できます。')
+  }
+
+  // 作業状態を読み込む関数
+  const importWorkState = async (file: File) => {
+    try {
+      const text = await file.text()
+      const saveData: SaveData = JSON.parse(text)
+
+      // バージョンチェック（将来の互換性のため）
+      if (!saveData.version) {
+        throw new Error('無効な保存ファイルです')
+      }
+
+      // 状態を復元
+      setDrawingImage(saveData.drawingImage)
+      setBoxes(saveData.boxes || [])
+      setMeasurements(saveData.measurements || [])
+      setViewTransform(saveData.viewTransform || { scale: 1, translateX: 0, translateY: 0 })
+
+      // 設定を復元
+      if (saveData.settings) {
+        setDefaultDecimalPlaces(saveData.settings.defaultDecimalPlaces)
+        setMinBoxSize(saveData.settings.minBoxSize)
+        setMinFontSize(saveData.settings.minFontSize)
+        setTextColorMode(saveData.settings.textColorMode)
+        setShowBoxNumbers(saveData.settings.showBoxNumbers)
+        setShowDeleteButtons(saveData.settings.showDeleteButtons)
+      }
+
+      // 測定値があればPDFロード済みフラグを立てる
+      if (saveData.measurements && saveData.measurements.length > 0) {
+        setPdfLoaded(true)
+      }
+
+      alert(
+        `✅ 作業状態を読み込みました！\n保存日時: ${new Date(saveData.savedAt).toLocaleString('ja-JP')}`
+      )
+    } catch (error) {
+      console.error('作業状態の読み込みエラー:', error)
+      alert('❌ ファイルの読み込みに失敗しました。\n正しい保存ファイルか確認してください。')
+    }
+  }
+
+  // ファイル入力ハンドラ
+  const handleWorkStateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && file.type === 'application/json') {
+      if (boxes.length > 0 || measurements.length > 0) {
+        if (confirm('現在の作業内容が失われます。続行しますか？')) {
+          importWorkState(file)
+        }
+      } else {
+        importWorkState(file)
+      }
+    } else {
+      alert('JSONファイルを選択してください')
+    }
+  }
+
   // スタイル定義（改善版）
   const styles = {
     container: {
@@ -2208,6 +2324,105 @@ const MeasurementPage = () => {
     }
   }, [])
 
+  // 自動保存機能（オプション - useEffect内に追加）
+  const AUTO_SAVE_INTERVAL = 60000 // 1分ごと
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null)
+
+  useEffect(() => {
+    // LocalStorageへの自動保存（ブラウザを閉じても残る）
+    const autoSave = () => {
+      if (boxes.length > 0 || drawingImage) {
+        const saveData: SaveData = {
+          version: '1.0.0',
+          savedAt: new Date().toISOString(),
+          drawingImage,
+          boxes,
+          measurements,
+          viewTransform,
+          settings: {
+            defaultDecimalPlaces,
+            minBoxSize,
+            minFontSize,
+            textColorMode,
+            showBoxNumbers,
+            showDeleteButtons,
+          },
+        }
+
+        try {
+          localStorage.setItem('measurementApp_autoSave', JSON.stringify(saveData))
+          setLastAutoSave(new Date())
+          console.log('自動保存完了:', new Date().toLocaleTimeString())
+        } catch (e) {
+          console.error('自動保存エラー:', e)
+        }
+      }
+    }
+
+    const interval = setInterval(autoSave, AUTO_SAVE_INTERVAL)
+
+    return () => clearInterval(interval)
+  }, [
+    boxes,
+    drawingImage,
+    measurements,
+    viewTransform,
+    defaultDecimalPlaces,
+    minBoxSize,
+    minFontSize,
+    textColorMode,
+    showBoxNumbers,
+    showDeleteButtons,
+  ])
+
+  // ページ読み込み時の自動復元（useEffect内に追加）
+  useEffect(() => {
+    const loadAutoSave = () => {
+      try {
+        const saved = localStorage.getItem('measurementApp_autoSave')
+        if (saved) {
+          const saveData: SaveData = JSON.parse(saved)
+          const savedDate = new Date(saveData.savedAt)
+          const now = new Date()
+          const hoursDiff = (now.getTime() - savedDate.getTime()) / (1000 * 60 * 60)
+
+          // 24時間以内の自動保存データがあれば復元するか確認
+          if (hoursDiff < 24) {
+            if (
+              confirm(
+                `前回の作業状態が見つかりました。\n（${savedDate.toLocaleString('ja-JP')}）\n\n復元しますか？`
+              )
+            ) {
+              // 状態を復元
+              setDrawingImage(saveData.drawingImage)
+              setBoxes(saveData.boxes || [])
+              setMeasurements(saveData.measurements || [])
+              setViewTransform(saveData.viewTransform || { scale: 1, translateX: 0, translateY: 0 })
+
+              if (saveData.settings) {
+                setDefaultDecimalPlaces(saveData.settings.defaultDecimalPlaces)
+                setMinBoxSize(saveData.settings.minBoxSize)
+                setMinFontSize(saveData.settings.minFontSize)
+                setTextColorMode(saveData.settings.textColorMode)
+                setShowBoxNumbers(saveData.settings.showBoxNumbers)
+                setShowDeleteButtons(saveData.settings.showDeleteButtons)
+              }
+
+              if (saveData.measurements && saveData.measurements.length > 0) {
+                setPdfLoaded(true)
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('自動保存データの読み込みエラー:', e)
+      }
+    }
+
+    // 初回のみ実行
+    loadAutoSave()
+  }, [])
+
   return (
     <div style={styles.container}>
       <div style={styles.mainContainer}>
@@ -2291,6 +2506,62 @@ const MeasurementPage = () => {
             <button style={styles.actionBtn(false)} onClick={exportResult}>
               💾 結果を保存
             </button>
+
+            {/* 作業状態の保存/読み込みボタンを追加 */}
+            <button
+              style={{
+                ...styles.uploadBtn,
+                background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+              }}
+              onClick={exportWorkState}
+              title="現在の作業状態をJSONファイルとして保存"
+            >
+              💾 作業状態を保存
+            </button>
+
+            <label>
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={handleWorkStateUpload}
+                style={{ display: 'none' }}
+                ref={workStateInputRef}
+              />
+              <button
+                style={{
+                  ...styles.uploadBtn,
+                  background: 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)',
+                }}
+                onClick={() => workStateInputRef.current?.click()}
+                title="保存した作業状態を読み込む"
+              >
+                📂 作業状態を読み込む
+              </button>
+            </label>
+
+            {/* 自動保存インジケーター（オプション） */}
+            {lastAutoSave && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  color: '#666',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 8px',
+                  background: '#f0f8ff',
+                  borderRadius: '12px',
+                }}
+              >
+                <span>🔄</span>
+                <span>自動保存: {lastAutoSave.toLocaleTimeString('ja-JP')}</span>
+              </div>
+            )}
+
+            <div style={styles.statusItem}>
+              <span>最終保存:</span>
+              <strong>{lastAutoSave ? lastAutoSave.toLocaleTimeString('ja-JP') : '未保存'}</strong>
+            </div>
 
             <div style={styles.decimalControl}>
               <span>デフォルト桁数:</span>
