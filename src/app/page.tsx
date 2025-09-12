@@ -63,6 +63,24 @@ interface SaveData {
   }
 }
 
+interface HistoryEntry {
+  id: string
+  timestamp: string
+  action: string // 'ボックス追加', '値編集', '削除' など
+  snapshot: SaveData
+  changes?: {
+    added?: Box[]
+    removed?: Box[]
+    modified?: Box[]
+  }
+}
+
+interface HistoryState {
+  entries: HistoryEntry[]
+  currentIndex: number
+  maxEntries: number // デフォルト50件
+}
+
 // SaveDialogコンポーネント
 const SaveDialog: React.FC<{
   showSaveDialog: boolean
@@ -264,6 +282,205 @@ const SaveDialog: React.FC<{
   }
 )
 
+// 汎用的な保存ダイアログコンポーネント（SaveDialogの改良版）
+const WorkStateSaveDialog: React.FC<{
+  showDialog: boolean
+  setShowDialog: (show: boolean) => void
+  fileName: string
+  setFileName: (name: string) => void
+  isSaving: boolean
+  performSave: () => Promise<void>
+}> = React.memo(({ showDialog, setShowDialog, fileName, setFileName, isSaving, performSave }) => {
+  if (!showDialog) return null
+
+  const getDefaultFileName = () => {
+    const now = new Date()
+    const dateStr = now.toISOString().slice(0, 10)
+    const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
+    return `図面_${dateStr}_${timeStr}`
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.6)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000,
+        backdropFilter: 'blur(5px)',
+      }}
+    >
+      <div
+        style={{
+          background: 'white',
+          borderRadius: '15px',
+          padding: '30px',
+          width: '500px',
+          maxWidth: '90%',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          fontFamily: '"Noto Sans JP", sans-serif',
+        }}
+      >
+        <h2
+          style={{
+            marginBottom: '25px',
+            color: '#333',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          💾 作業状態を保存
+        </h2>
+
+        <div style={{ marginBottom: '25px' }}>
+          <label
+            style={{
+              display: 'block',
+              marginBottom: '10px',
+              color: '#555',
+              fontWeight: '500',
+            }}
+          >
+            ファイル名:
+          </label>
+          <input
+            type="text"
+            value={fileName}
+            onChange={(e) => setFileName(e.target.value)}
+            placeholder={getDefaultFileName()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isSaving) {
+                performSave()
+              } else if (e.key === 'Escape') {
+                setShowDialog(false)
+                setFileName('')
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              fontSize: '15px',
+              fontFamily: '"Noto Sans JP", sans-serif',
+              transition: 'border-color 0.2s',
+              outline: 'none',
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = '#667eea'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = '#e0e0e0'
+            }}
+            autoFocus
+            disabled={isSaving}
+          />
+          <small
+            style={{
+              color: '#888',
+              fontSize: '12px',
+              marginTop: '5px',
+              display: 'block',
+            }}
+          >
+            ※ .json 拡張子は自動的に追加されます
+          </small>
+        </div>
+
+        {'showSaveFilePicker' in window && (
+          <div
+            style={{
+              background: '#e8f5e9',
+              padding: '12px',
+              borderRadius: '8px',
+              marginBottom: '20px',
+              fontSize: '13px',
+              color: '#2e7d32',
+            }}
+          >
+            💡 <strong>ヒント:</strong> 保存ボタンを押すと、保存場所を選択できます
+          </div>
+        )}
+
+        <div
+          style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <button
+            onClick={() => {
+              setShowDialog(false)
+              setFileName('')
+            }}
+            disabled={isSaving}
+            style={{
+              padding: '10px 24px',
+              border: '2px solid #e0e0e0',
+              borderRadius: '8px',
+              background: 'white',
+              color: '#666',
+              cursor: isSaving ? 'not-allowed' : 'pointer',
+              fontWeight: '500',
+              fontSize: '14px',
+              fontFamily: '"Noto Sans JP", sans-serif',
+              transition: 'all 0.2s',
+              opacity: isSaving ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isSaving) {
+                e.currentTarget.style.background = '#f5f5f5'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'white'
+            }}
+          >
+            キャンセル
+          </button>
+          <button
+            onClick={performSave}
+            disabled={isSaving}
+            style={{
+              padding: '10px 32px',
+              background: isSaving ? '#999' : 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: isSaving ? 'not-allowed' : 'pointer',
+              fontWeight: '600',
+              fontSize: '14px',
+              fontFamily: '"Noto Sans JP", sans-serif',
+              transition: 'all 0.2s',
+              boxShadow: isSaving ? 'none' : '0 4px 15px rgba(40, 167, 69, 0.4)',
+            }}
+            onMouseEnter={(e) => {
+              if (!isSaving) {
+                e.currentTarget.style.transform = 'translateY(-1px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(40, 167, 69, 0.5)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(40, 167, 69, 0.4)'
+            }}
+          >
+            {isSaving ? '保存中...' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+})
+
 // メインコンポーネント
 const MeasurementPage = () => {
   // State管理
@@ -315,6 +532,16 @@ const MeasurementPage = () => {
   const [tempFontSize, setTempFontSize] = useState<number | null>(null)
   const [isSliderDragging, setIsSliderDragging] = useState(false)
   const [hasCheckedAutoSave, setHasCheckedAutoSave] = useState(false)
+  const [showWorkStateSaveDialog, setShowWorkStateSaveDialog] = useState(false)
+  const [workStateSaveFileName, setWorkStateSaveFileName] = useState('')
+  const [isWorkStateSaving, setIsWorkStateSaving] = useState(false)
+  const [history, setHistory] = useState<HistoryState>({
+    // 履歴管理用のState
+    entries: [],
+    currentIndex: -1,
+    maxEntries: 50,
+  })
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false)
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -499,11 +726,15 @@ const MeasurementPage = () => {
   // 編集確定
   const handleEditConfirm = () => {
     if (editingBoxId !== null) {
-      setBoxes((prev) =>
-        prev.map((box) =>
+      const editedBox = boxes.find((box) => box.id === editingBoxId)
+      if (editedBox) {
+        const updatedBoxes = boxes.map((box) =>
           box.id === editingBoxId ? { ...box, value: editingValue, isManuallyEdited: true } : box
         )
-      )
+        setBoxes(updatedBoxes)
+        // 履歴に記録
+        recordHistory(`ボックス${editedBox.index + 1}の値を編集`, updatedBoxes)
+      }
       setEditingBoxId(null)
       setEditingValue('')
     }
@@ -1315,13 +1546,15 @@ const MeasurementPage = () => {
     setIsDrawing(false)
 
     if (currentBox.width > minBoxSize && currentBox.height > minBoxSize) {
-      // 空いている最小の番号を取得して設定
       const newIndex = getNextAvailableIndex(boxes)
       const newBox = {
         ...currentBox,
-        index: newIndex, // boxes.lengthではなく、空いている番号を使用
+        index: newIndex,
       }
-      setBoxes((prev) => [...prev, newBox])
+      const updatedBoxes = [...boxes, newBox] // 新しい配列を作成
+      setBoxes(updatedBoxes)
+      // 履歴に記録（新しいボックス配列を直接渡す）
+      recordHistory(`ボックス${newIndex + 1}を追加`, updatedBoxes) // 最新の状態を渡す
     }
 
     setCurrentBox(null)
@@ -1386,12 +1619,17 @@ const MeasurementPage = () => {
       return box
     })
     setBoxes(updatedBoxes)
+    // 履歴に記録
+    recordHistory('測定値を自動転記', updatedBoxes)
   }
 
   // ボックスクリア
   const clearBoxes = () => {
     if (confirm('すべてのボックスを削除しますか？')) {
+      const previousBoxes = [...boxes] // 削除前の状態を保存
       setBoxes([])
+      // 履歴に記録
+      recordHistory(`すべてのボックスをクリア（${previousBoxes.length}個）`, [])
     }
   }
 
@@ -1643,73 +1881,143 @@ const MeasurementPage = () => {
       return
     }
 
-    setBoxes((prev) => {
-      // 現在のindex順でソート
-      const sorted = [...prev].sort((a, b) => a.index - b.index)
-
-      // 値のマッピングを保持（必要な場合）
-      const valueMapping = new Map()
-      sorted.forEach((box, newIndex) => {
-        if (box.value && !box.isManuallyEdited) {
-          valueMapping.set(newIndex, box.value)
-        }
-      })
-
-      // 0から順番に番号を振り直す
+    const updatedBoxes = (() => {
+      // ソートと番号振り直し処理
+      const sorted = [...boxes].sort((a, b) => a.index - b.index)
       return sorted.map((box, newIndex) => ({
         ...box,
         index: newIndex,
-        // 番号整理時に値を維持するかどうか選択可能
         value: box.isManuallyEdited ? box.value : null,
         isOutOfTolerance: box.isManuallyEdited ? box.isOutOfTolerance : false,
       }))
-    })
+    })()
+
+    setBoxes(updatedBoxes)
+    // 履歴に記録
+    recordHistory('番号を整理', updatedBoxes)
   }
 
   // ボックス削除
   const deleteBox = (boxId: number) => {
-    setBoxes((prev) => prev.filter((box) => box.id !== boxId))
+    const boxToDelete = boxes.find((box) => box.id === boxId)
+    if (boxToDelete) {
+      const updatedBoxes = boxes.filter((box) => box.id !== boxId)
+      setBoxes(updatedBoxes)
+      // 履歴に記録
+      recordHistory(`ボックス${boxToDelete.index + 1}を削除`, updatedBoxes)
+    }
   }
 
-  // 2. 作業状態を保存する関数
+  // 作業状態を保存する関数
   const exportWorkState = () => {
-    const saveData: SaveData = {
-      version: '1.0.0',
-      savedAt: new Date().toISOString(),
-      drawingImage,
-      boxes,
-      measurements,
-      viewTransform,
-      settings: {
-        defaultDecimalPlaces,
-        minBoxSize,
-        minFontSize,
-        textColorMode,
-        showBoxNumbers,
-        showDeleteButtons,
-      },
-    }
+    // ダイアログを表示
+    setShowWorkStateSaveDialog(true)
 
-    // JSONファイルとしてダウンロード
-    const dataStr = JSON.stringify(saveData, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(dataBlob)
-
-    const link = document.createElement('a')
-    link.href = url
-
-    // ファイル名を自動生成
+    // デフォルトファイル名を設定
     const now = new Date()
     const dateStr = now.toISOString().slice(0, 10)
     const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
-    link.download = `作業状態_${dateStr}_${timeStr}.json`
+    setWorkStateSaveFileName(`図面_${dateStr}_${timeStr}`)
+  }
 
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+  // 実際の保存処理を行う関数
+  const performWorkStateSave = async () => {
+    setIsWorkStateSaving(true)
 
-    alert('✅ 作業状態を保存しました！\n後で「作業状態を読み込む」から再開できます。')
+    try {
+      const saveData: SaveData = {
+        version: '1.0.0',
+        savedAt: new Date().toISOString(),
+        drawingImage,
+        boxes,
+        measurements,
+        viewTransform,
+        settings: {
+          defaultDecimalPlaces,
+          minBoxSize,
+          minFontSize,
+          textColorMode,
+          showBoxNumbers,
+          showDeleteButtons,
+        },
+      }
+
+      const dataStr = JSON.stringify(saveData, null, 2)
+      const dataBlob = new Blob([dataStr], { type: 'application/json' })
+
+      // ファイル名を決定
+      const getDefaultFileName = () => {
+        const now = new Date()
+        const dateStr = now.toISOString().slice(0, 10)
+        const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
+        return `図面_${dateStr}_${timeStr}`
+      }
+
+      const finalFileName = workStateSaveFileName || getDefaultFileName()
+
+      // File System Access APIをサポートしているか確認
+      if ('showSaveFilePicker' in window) {
+        try {
+          // ネイティブの保存ダイアログを表示
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: `${finalFileName}.json`,
+            types: [
+              {
+                description: 'JSONファイル',
+                accept: { 'application/json': ['.json'] },
+              },
+            ],
+            startIn: 'downloads',
+          })
+
+          const writable = await handle.createWritable()
+          await writable.write(dataBlob)
+          await writable.close()
+
+          // 成功メッセージ
+          alert('✅ 作業状態を保存しました！\n後で「作業状態を読み込む」から再開できます。')
+        } catch (err: any) {
+          // ユーザーがキャンセルした場合
+          if (err.name === 'AbortError') {
+            console.log('保存がキャンセルされました')
+          } else {
+            console.error('保存エラー:', err)
+            // エラー時はフォールバック
+            const url = URL.createObjectURL(dataBlob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `${finalFileName}.json`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+
+            alert('⚠️ ネイティブ保存に失敗したため、通常のダウンロードで保存しました。')
+          }
+        }
+      } else {
+        // File System Access API非対応のブラウザ
+        const url = URL.createObjectURL(dataBlob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `${finalFileName}.json`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        alert('📥 作業状態をダウンロードフォルダに保存しました！')
+      }
+
+      // ダイアログを閉じる
+      setShowWorkStateSaveDialog(false)
+      setWorkStateSaveFileName('')
+    } catch (error) {
+      console.error('作業状態の保存エラー:', error)
+      alert('❌ 作業状態の保存に失敗しました。')
+    } finally {
+      setIsWorkStateSaving(false)
+    }
   }
 
   // 作業状態を読み込む関数
@@ -1766,6 +2074,116 @@ const MeasurementPage = () => {
       }
     } else {
       alert('JSONファイルを選択してください')
+    }
+  }
+
+  // 履歴に現在の状態を記録
+  const recordHistory = useCallback(
+    (action: string, newBoxes?: Box[]) => {
+      // 新しいボックス配列が渡された場合はそれを使用、そうでなければ現在のstateを使用
+      const boxesToRecord = newBoxes || boxes
+
+      const currentState: SaveData = {
+        version: '1.0.0',
+        savedAt: new Date().toISOString(),
+        drawingImage,
+        boxes: boxesToRecord, // 最新の状態を確実に記録！
+        measurements,
+        viewTransform,
+        settings: {
+          defaultDecimalPlaces,
+          minBoxSize,
+          minFontSize,
+          textColorMode,
+          showBoxNumbers,
+          showDeleteButtons,
+        },
+      }
+
+      const newEntry: HistoryEntry = {
+        id: `history_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        action,
+        snapshot: currentState,
+      }
+
+      setHistory((prev) => {
+        // 現在位置より後の履歴を削除（新しい分岐を作成）
+        const newEntries = prev.entries.slice(0, prev.currentIndex + 1)
+        newEntries.push(newEntry)
+
+        // 最大件数を超えたら古いものを削除
+        if (newEntries.length > prev.maxEntries) {
+          newEntries.shift()
+        }
+
+        return {
+          ...prev,
+          entries: newEntries,
+          currentIndex: newEntries.length - 1,
+        }
+      })
+    },
+    [
+      boxes,
+      drawingImage,
+      measurements,
+      viewTransform,
+      defaultDecimalPlaces,
+      minBoxSize,
+      minFontSize,
+      textColorMode,
+      showBoxNumbers,
+      showDeleteButtons,
+    ]
+  )
+
+  // Undo機能
+  const undo = () => {
+    if (history.currentIndex > 0) {
+      const targetIndex = history.currentIndex - 1
+      const targetState = history.entries[targetIndex].snapshot
+
+      // 状態を復元
+      restoreState(targetState)
+      setHistory((prev) => ({ ...prev, currentIndex: targetIndex }))
+    }
+  }
+
+  // Redo機能
+  const redo = () => {
+    if (history.currentIndex < history.entries.length - 1) {
+      const targetIndex = history.currentIndex + 1
+      const targetState = history.entries[targetIndex].snapshot
+
+      restoreState(targetState)
+      setHistory((prev) => ({ ...prev, currentIndex: targetIndex }))
+    }
+  }
+
+  // 特定の履歴時点に巻き戻し
+  const revertToHistory = (index: number) => {
+    if (index >= 0 && index < history.entries.length) {
+      const targetState = history.entries[index].snapshot
+      restoreState(targetState)
+      setHistory((prev) => ({ ...prev, currentIndex: index }))
+    }
+  }
+
+  // 状態復元のヘルパー関数
+  const restoreState = (state: SaveData) => {
+    setDrawingImage(state.drawingImage)
+    setBoxes(state.boxes || [])
+    setMeasurements(state.measurements || [])
+    setViewTransform(state.viewTransform || { scale: 1, translateX: 0, translateY: 0 })
+
+    if (state.settings) {
+      setDefaultDecimalPlaces(state.settings.defaultDecimalPlaces)
+      setMinBoxSize(state.settings.minBoxSize)
+      setMinFontSize(state.settings.minFontSize)
+      setTextColorMode(state.settings.textColorMode)
+      setShowBoxNumbers(state.settings.showBoxNumbers)
+      setShowDeleteButtons(state.settings.showDeleteButtons)
     }
   }
 
@@ -1834,6 +2252,17 @@ const MeasurementPage = () => {
       fontFamily: '"Noto Sans JP", sans-serif',
       marginLeft: 'auto',
       flexShrink: 0,
+    },
+    pdfBtn: {
+      background: 'linear-gradient(135deg, #9e0303 0%, #764ba2 100%)',
+      color: 'white',
+      border: 'none',
+      padding: '8px 16px',
+      borderRadius: '20px',
+      cursor: 'pointer',
+      fontWeight: '600',
+      fontFamily: '"Noto Sans JP", sans-serif',
+      fontSize: '14px',
     },
     uploadBtn: {
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -2432,6 +2861,24 @@ const MeasurementPage = () => {
     loadAutoSave()
   }, [])
 
+  // キーボードショートカット
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault()
+          undo()
+        } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+          e.preventDefault()
+          redo()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [history])
+
   return (
     <div style={styles.container}>
       <div style={styles.mainContainer}>
@@ -2512,15 +2959,11 @@ const MeasurementPage = () => {
               🔢 番号整理
             </button>
 
-            <button style={styles.actionBtn(false)} onClick={exportResult}>
-              💾 結果を保存
-            </button>
-
             {/* 作業状態の保存/読み込みボタンを追加 */}
             <button
               style={{
                 ...styles.uploadBtn,
-                background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+                background: 'linear-gradient(135deg, rgb(90, 231, 189)0%,rgb(2, 107, 25) 100%)',
               }}
               onClick={exportWorkState}
               title="現在の作業状態をJSONファイルとして保存"
@@ -2539,7 +2982,7 @@ const MeasurementPage = () => {
               <button
                 style={{
                   ...styles.uploadBtn,
-                  background: 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)',
+                  background: 'linear-gradient(135deg,rgb(85, 199, 216) 0%,rgb(7, 54, 155) 100%)',
                 }}
                 onClick={() => workStateInputRef.current?.click()}
                 title="保存した作業状態を読み込む"
@@ -2547,6 +2990,48 @@ const MeasurementPage = () => {
                 📂 作業状態を読み込む
               </button>
             </label>
+
+            <button
+              style={{
+                ...styles.pdfBtn,
+                background: 'linear-gradient(135deg,rgb(212, 195, 94) 0%,rgb(235, 9, 9) 100%)',
+              }}
+              onClick={exportResult}
+            >
+              📄 PDFで保存
+            </button>
+
+            {/* 履歴管理ボタン */}
+            <button
+              style={{
+                ...styles.actionBtn(false),
+                opacity: history.currentIndex > 0 ? 1 : 0.5,
+              }}
+              onClick={undo}
+              disabled={history.currentIndex <= 0}
+              title="元に戻す (Ctrl+Z)"
+            >
+              ↶ 元に戻す
+            </button>
+
+            <button
+              style={{
+                ...styles.actionBtn(false),
+                opacity: history.currentIndex < history.entries.length - 1 ? 1 : 0.5,
+              }}
+              onClick={redo}
+              disabled={history.currentIndex >= history.entries.length - 1}
+              title="やり直す (Ctrl+Y)"
+            >
+              ↷ やり直す
+            </button>
+
+            <button
+              style={styles.actionBtn(isHistoryPanelOpen)}
+              onClick={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}
+            >
+              📜 履歴 ({history.entries.length})
+            </button>
 
             {/* 自動保存インジケーター（オプション） */}
             {lastAutoSave && (
@@ -3464,6 +3949,101 @@ const MeasurementPage = () => {
         isSaving={isSaving}
         performSave={performSave}
       />
+      {/* 作業状態保存ダイアログ */}
+      <WorkStateSaveDialog
+        showDialog={showWorkStateSaveDialog}
+        setShowDialog={setShowWorkStateSaveDialog}
+        fileName={workStateSaveFileName}
+        setFileName={setWorkStateSaveFileName}
+        isSaving={isWorkStateSaving}
+        performSave={performWorkStateSave}
+      />
+      {/* 履歴パネル */}
+      {isHistoryPanelOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            right: '20px',
+            top: '100px',
+            width: '300px',
+            maxHeight: '500px',
+            background: 'white',
+            borderRadius: '10px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+            zIndex: 1000,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <div
+            style={{
+              padding: '15px',
+              borderBottom: '1px solid #e0e0e0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: '16px' }}>変更履歴</h3>
+            <button
+              onClick={() => setIsHistoryPanelOpen(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '20px',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '10px',
+            }}
+          >
+            {history.entries.length === 0 ? (
+              <p style={{ color: '#999', textAlign: 'center' }}>まだ履歴がありません</p>
+            ) : (
+              history.entries.map((entry, index) => (
+                <div
+                  key={entry.id}
+                  style={{
+                    padding: '8px 12px',
+                    marginBottom: '5px',
+                    background: index === history.currentIndex ? '#e3f2fd' : '#f5f5f5',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    borderLeft: index === history.currentIndex ? '3px solid #667eea' : 'none',
+                  }}
+                  onClick={() => revertToHistory(index)}
+                >
+                  <div style={{ fontWeight: 'bold' }}>{entry.action}</div>
+                  <div style={{ fontSize: '11px', color: '#666' }}>
+                    {new Date(entry.timestamp).toLocaleTimeString('ja-JP')}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div
+            style={{
+              padding: '10px',
+              borderTop: '1px solid #e0e0e0',
+              fontSize: '12px',
+              color: '#666',
+            }}
+          >
+            最大{history.maxEntries}件まで保存
+          </div>
+        </div>
+      )}
     </div>
   )
 }
