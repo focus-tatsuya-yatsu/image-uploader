@@ -17,6 +17,7 @@ interface Box {
   decimalPlaces: number
   isManuallyEdited?: boolean
   isOutOfTolerance?: boolean
+  fontSize?: number  // 追加：個別のフォントサイズ設定
 }
 
 interface ResizeHandle {
@@ -294,6 +295,8 @@ const MeasurementPage = () => {
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle['position'] | null>(null)
   const [resizeStartBox, setResizeStartBox] = useState<Box | null>(null)
   const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 })
+  const [tempFontSize, setTempFontSize] = useState<number | null>(null)
+  const [isSliderDragging, setIsSliderDragging] = useState(false)
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -432,8 +435,14 @@ const MeasurementPage = () => {
     text: string,
     boxWidth: number,
     boxHeight: number,
-    isVertical: boolean
+    isVertical: boolean,
+    customFontSize?: number  // カスタムフォントサイズパラメータを追加
   ): number => {
+     // カスタムフォントサイズが設定されている場合はそれを返す
+  if (customFontSize !== undefined && customFontSize > 0) {
+    return customFontSize
+  }
+
     const padding = 2
     const availableWidth = boxWidth - padding * 2
     const availableHeight = boxHeight - padding * 2
@@ -521,7 +530,7 @@ const MeasurementPage = () => {
     e.stopPropagation()
 
     // メニューの推定サイズ
-    const menuHeight = 600 // メニューの推定高さ
+    const menuHeight = 830 // メニューの推定高さ
     const menuWidth = 250 // メニューの推定幅
 
     // ウィンドウのサイズを取得
@@ -529,8 +538,8 @@ const MeasurementPage = () => {
     const windowWidth = window.innerWidth
 
     // クリック位置
-    let x = e.clientX
-    let y = e.clientY
+    let x = e.clientX + 50
+    let y = e.clientY + 100
 
     // 右端チェック
     if (x + menuWidth > windowWidth) {
@@ -559,6 +568,7 @@ const MeasurementPage = () => {
   // 右クリックメニュー非表示
   const hideContextMenu = () => {
     setContextMenu({ visible: false, x: 0, y: 0, boxId: null })
+    setTempFontSize(null)
   }
 
   // 桁数変更
@@ -582,6 +592,22 @@ const MeasurementPage = () => {
       })
     )
     hideContextMenu()
+  }
+
+  // フォントサイズ変更関数を追加
+  const changeFontSize = (boxId: number, fontSize: number | undefined) => {
+    setBoxes((prev) =>
+      prev.map((box) => {
+        if (box.id === boxId) {
+          return { ...box, fontSize }
+        }
+        return box
+      })
+    )
+    // hideContextMenu()を呼ばないようにする（メニューは開いたまま）
+    if (fontSize === undefined) {
+      setTempFontSize(null)
+    }
   }
 
   // インデックス変更機能を追加
@@ -1038,6 +1064,7 @@ const MeasurementPage = () => {
       value: null,
       index: newIndex, // boxes.lengthではなく、空いている番号を使用
       decimalPlaces: defaultDecimalPlaces,
+      fontSize: undefined, // 明示的にundefinedを設定（自動計算を使用）
     })
   }
 
@@ -1771,6 +1798,7 @@ const MeasurementPage = () => {
       MozUserDrag: 'none' as const,
       userDrag: 'none' as const,
     },
+    
     box: (
       isVertical: boolean,
       fontSize: number,
@@ -1947,11 +1975,11 @@ const MeasurementPage = () => {
       background: 'white',
       borderRadius: '8px',
       boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-      padding: '8px 0',
+      paddingBottom: '8px',
       zIndex: 2000,
       minWidth: '200px',
       maxWidth: '300px',
-      maxHeight: '80vh', // 画面の80%までの高さに制限
+      maxHeight: '78vh', // 画面の80%までの高さに制限
       overflowY: 'auto' as const, // スクロール可能に
       overflowX: 'hidden' as const,
     },
@@ -1970,7 +1998,6 @@ const MeasurementPage = () => {
       maxHeight: '250px', // セクションごとの高さ制限
       overflowY: 'auto' as const,
       overflowX: 'hidden' as const,
-      borderTop: '1px solid #e0e0e0',
       borderBottom: '1px solid #e0e0e0',
     },
     zoomInfo: {
@@ -2063,16 +2090,123 @@ const MeasurementPage = () => {
 
   // 右クリックメニューを閉じる
   useEffect(() => {
-    const handleClick = () => hideContextMenu()
-    document.addEventListener('click', handleClick)
-    return () => document.removeEventListener('click', handleClick)
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isSliderDragging) {
+        return
+      }
+      
+      const target = e.target as HTMLElement
+
+      // ボタン要素のチェックを追加
+    if (target.tagName === 'BUTTON' && target.closest('[data-slider-container="true"]')) {
+      return // スライダーコンテナ内のボタンは無視
+    }
+      
+      // input[type="range"]の親要素も含めてチェック
+      const isSliderInteraction = target.closest('input[type="range"]') || 
+                                  target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'range'
+      if (isSliderInteraction) {
+        return
+      }
+      
+      hideContextMenu()
+    }
+    
+    if (contextMenu.visible) {
+      // mousedownイベントも追加して早期に判定
+      const handleMouseDown = (e: MouseEvent) => {
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'range') {
+          setIsSliderDragging(true)
+        }
+      }
+      
+      const handleMouseUp = () => {
+        setIsSliderDragging(false)
+      }
+      
+      setTimeout(() => {
+        document.addEventListener('click', handleClickOutside)
+        document.addEventListener('mousedown', handleMouseDown)
+        document.addEventListener('mouseup', handleMouseUp)
+      }, 100)
+      
+      return () => {
+        document.removeEventListener('click', handleClickOutside)
+        document.removeEventListener('mousedown', handleMouseDown)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [contextMenu.visible, isSliderDragging])
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isSliderDragging) {
+        setIsSliderDragging(false)
+      }
+    }
+    
+    // グローバルにmouseupを監視
+    window.addEventListener('mouseup', handleGlobalMouseUp)
+    window.addEventListener('touchend', handleGlobalMouseUp)
+    
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp)
+      window.removeEventListener('touchend', handleGlobalMouseUp)
+    }
+  }, [isSliderDragging])
+
+  useEffect(() => {
+    const sliderStyles = `
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 2px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        position: relative;
+        z-index: 2;
+      }
+  
+      input[type="range"]::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: 2px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+  
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+      }
+  
+      input[type="range"]::-moz-range-thumb:hover {
+        transform: scale(1.2);
+      }
+    `
+  
+    const styleSheet = document.createElement("style")
+    styleSheet.textContent = sliderStyles
+    document.head.appendChild(styleSheet)
+  
+    return () => {
+      if (document.head.contains(styleSheet)) {
+        document.head.removeChild(styleSheet)
+      }
+    }
   }, [])
 
   return (
     <div style={styles.container}>
       <div style={styles.mainContainer}>
         <div style={styles.header}>
-          <h1 style={{ margin: '0', fontSize: '24px' }}>📊 図面測定値転記システム</h1>
+          <h1 style={{ margin: '0', fontSize: '24px' }}>図面測定値転記システム</h1>
           <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>CalypsoとZEISS両形式のPDFに対応</p>
         </div>
 
@@ -2087,7 +2221,7 @@ const MeasurementPage = () => {
                 ref={fileInputRef}
               />
               <button style={styles.uploadBtn} onClick={() => fileInputRef.current?.click()}>
-                🖼 図面をアップロード
+              📐 図面をアップロード
               </button>
             </label>
 
@@ -2200,24 +2334,6 @@ const MeasurementPage = () => {
               />
               <span>px</span>
             </div>
-
-            <div style={styles.decimalControl}>
-              <span>最小フォント:</span>
-              <input
-                type="number"
-                min="1"
-                max="6"
-                value={minFontSize}
-                onChange={(e) => setMinFontSize(parseInt(e.target.value) || 1)}
-                style={{
-                  width: '40px',
-                  padding: '2px 4px',
-                  borderRadius: '4px',
-                  border: '1px solid #ccc',
-                }}
-              />
-              <span>px</span>
-            </div>
           </div>
 
           {/* 自動転記ボタンを右端に配置 */}
@@ -2236,7 +2352,7 @@ const MeasurementPage = () => {
               e.currentTarget.style.boxShadow = '0 4px 15px rgba(40, 167, 69, 0.4)'
             }}
           >
-            🔄 測定値を自動転記
+            📝 測定値を自動転記
           </button>
         </div>
 
@@ -2244,7 +2360,7 @@ const MeasurementPage = () => {
         <div style={styles.scrollableContent}>
           <div style={styles.mainContent}>
             <div style={styles.panel}>
-              <h3>図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
+              <h3>📐 図面（ズーム: {Math.round(viewTransform.scale * 100)}%）</h3>
               <div
                 ref={canvasRef}
                 style={styles.canvasContainer}
@@ -2271,7 +2387,13 @@ const MeasurementPage = () => {
                     const isVertical = box.height > box.width * 1.5
                     const formattedValue = formatValue(box.value, box.decimalPlaces)
                     const fontSize = box.value
-                      ? calculateOptimalFontSize(formattedValue, box.width, box.height, isVertical)
+                      ? calculateOptimalFontSize(
+                        formattedValue,
+                        box.width,
+                        box.height,
+                        isVertical,
+                        box.fontSize // カスタムフォントサイズを渡す
+                      )
                       : 14
                     const isEditing = editingBoxId === box.id
 
@@ -2655,10 +2777,16 @@ const MeasurementPage = () => {
                   <strong>🔢 番号変更:</strong> 右クリック → 任意の番号（1〜1000）を直接指定可能
                 </li>
                 <li style={{ marginBottom: '8px' }}>
-                  <strong>🤚 移動モード + マウスホイール:</strong> ズーム（最大1000倍）
+                  <strong>🤚 移動・編集モード + マウスホイール:</strong> ズーム（最大1000倍）
                 </li>
                 <li style={{ marginBottom: '8px' }}>
-                  <strong>🤚 移動モード + ドラッグ:</strong> 画面移動
+                  <strong>🤚 移動・編集モード + ドラッグ:</strong> 画面移動
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🤚 移動・編集モード + リサイズハンドル :</strong> ボックスのサイズ調整
+                </li>
+                <li style={{ marginBottom: '8px' }}>
+                  <strong>🤚 移動・編集モード + ボックスのドラッグ :</strong> ボックスの移動
                 </li>
                 <li style={{ marginBottom: '8px' }}>
                   <strong>🔄 Calypso/ZEISS形式:</strong> 両方のPDF形式に対応
@@ -2675,6 +2803,7 @@ const MeasurementPage = () => {
       {/* 右クリックメニュー */}
       {contextMenu.visible && (
         <div
+        data-context-menu="true"  // ⭐ 追加: 識別用のデータ属性
           style={{
             ...styles.contextMenu,
             left: `${contextMenu.x}px`,
@@ -2700,9 +2829,8 @@ const MeasurementPage = () => {
           <div
             style={{
               ...styles.contextMenuItem,
-              borderBottom: '2px solid #e0e0e0',
+              borderBottom: '1px solid #e0e0e0',
               paddingBottom: '12px',
-              marginBottom: '8px',
               background: '#fff9e6',
             }}
             onClick={() => {
@@ -2781,14 +2909,212 @@ const MeasurementPage = () => {
               )
             })}
           </div>
+     {/* フォントサイズ設定セクション（スライダー版） */}
+     <div
+  style={{
+    padding: '12px 16px',
+    background: '#fafafa',
+  }}
+  data-slider-container="true"
+  onClick={(e) => e.stopPropagation()}
+  onMouseDown={(e) => e.stopPropagation()}
+  onMouseUp={(e) => e.stopPropagation()}
+>
+  <div
+    style={{
+      fontSize: '13px',
+      color: '#666',
+      marginBottom: '10px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    }}
+  >
+    <span>フォントサイズ:</span>
+    <span
+      style={{
+        fontWeight: 'bold',
+        color: '#333',
+        fontSize: '14px',
+      }}
+    >
+      {(() => {
+        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+        const fontSize = tempFontSize ?? currentBox?.fontSize
+        return fontSize ? `${fontSize}px` : '自動'
+      })()}
+    </span>
+  </div>
 
+  {/* 自動/手動切り替えボタン */}
+  <div style={{ marginBottom: '10px' }}>
+  <button
+  onClick={(e) => {
+    e.stopPropagation()
+    e.preventDefault() // 追加：デフォルト動作を防ぐ
+    const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+    if (currentBox) {
+      if (currentBox.fontSize === undefined) {
+        // 自動→手動に切り替え
+        const isVertical = currentBox.height > currentBox.width * 1.5
+        const formattedValue = formatValue(currentBox.value, currentBox.decimalPlaces)
+        const calculatedSize = calculateOptimalFontSize(
+          formattedValue || '0',
+          currentBox.width,
+          currentBox.height,
+          isVertical
+        )
+        changeFontSize(currentBox.id, calculatedSize)
+        setTempFontSize(calculatedSize)
+      } else {
+        // 手動→自動に切り替え
+        changeFontSize(currentBox.id, undefined)
+        setTempFontSize(null)
+      }
+    }
+    return false // 追加：イベントの伝播を完全に停止
+  }}
+  onMouseDown={(e) => {
+    e.stopPropagation()
+    e.preventDefault()
+  }}
+      style={{
+        width: '100%',
+        padding: '6px',
+        background: 'white',
+        border: '1px solid #ddd',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        fontSize: '12px',
+        marginBottom: '8px',
+      }}
+    >
+      {(() => {
+        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+        return currentBox?.fontSize === undefined 
+          ? '🔄 手動調整に切り替え' 
+          : '🔄 自動調整に戻す'
+      })()}
+    </button>
+  </div>
+
+  {/* スライダー（手動モードの時のみ有効） */}
+  <div style={{ position: 'relative' }}>
+    <input
+      type="range"
+      min="1"
+      max="100"
+      step="1"
+      value={(() => {
+        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+        
+        // tempFontSizeがある場合はそれを使用
+        if (tempFontSize !== null) return tempFontSize
+        
+        // fontSizeが設定されている場合はそれを使用
+        if (currentBox?.fontSize !== undefined) return currentBox.fontSize
+        
+        // それ以外は現在の計算値を使用
+        if (currentBox) {
+          const isVertical = currentBox.height > currentBox.width * 1.5
+          const formattedValue = formatValue(currentBox.value, currentBox.decimalPlaces)
+          return calculateOptimalFontSize(
+            formattedValue || '0',
+            currentBox.width,
+            currentBox.height,
+            isVertical
+          )
+        }
+        
+        return 14 // デフォルト値
+      })()}
+      onChange={(e) => {
+        e.stopPropagation()
+        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+        const newSize = parseInt(e.target.value)
+        
+        if (currentBox?.fontSize === undefined) {
+          // 自動モードから手動モードに切り替え
+          changeFontSize(contextMenu.boxId!, newSize)
+        } else {
+          // 既に手動モードの場合
+          changeFontSize(contextMenu.boxId!, newSize)
+        }
+        setTempFontSize(newSize)
+      }}
+      disabled={(() => {
+        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+        return currentBox?.fontSize === undefined // 自動モードの時は無効
+      })()}
+      onMouseDown={(e) => {
+        e.stopPropagation()
+        setIsSliderDragging(true)
+      }}
+      onMouseUp={(e) => {
+        e.stopPropagation()
+        setIsSliderDragging(false)
+      }}
+      onTouchStart={(e) => {
+        e.stopPropagation()
+        setIsSliderDragging(true)
+      }}
+      onTouchEnd={(e) => {
+        e.stopPropagation()
+        setIsSliderDragging(false)
+      }}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: '100%',
+        height: '6px',
+        background: 'transparent',
+        outline: 'none',
+        cursor: (() => {
+          const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+          return currentBox?.fontSize === undefined ? 'not-allowed' : 'pointer'
+        })(),
+        opacity: (() => {
+          const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+          return currentBox?.fontSize === undefined ? 0.5 : 1
+        })(),
+        WebkitAppearance: 'none',
+        MozAppearance: 'none',
+        appearance: 'none',
+        position: 'relative',
+        zIndex: 10,
+      }}
+    />
+        {/* カスタムスライダートラック */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: '#e0e0e0',
+            borderRadius: '2px',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+          }}
+        >
           <div
             style={{
-              borderTop: '1px solid #e0e0e0',
-              marginTop: '4px',
-              paddingTop: '4px',
+              position: 'absolute',
+              left: 0,
+              height: '100%',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '2px',
+              width: `${(() => {
+                const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                const fontSize = tempFontSize ?? currentBox?.fontSize ?? 14
+                return ((fontSize - 1) / (101 - 1)) * 100
+              })()}%`,
             }}
           />
+        </div>
+      </div>
+    </div>
+
           {/* 既存の小数点設定 */}
           <div
             style={{
