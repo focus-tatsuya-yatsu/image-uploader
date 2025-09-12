@@ -17,7 +17,7 @@ interface Box {
   decimalPlaces: number
   isManuallyEdited?: boolean
   isOutOfTolerance?: boolean
-  fontSize?: number  // 追加：個別のフォントサイズ設定
+  fontSize?: number // 追加：個別のフォントサイズ設定
 }
 
 interface ResizeHandle {
@@ -436,12 +436,12 @@ const MeasurementPage = () => {
     boxWidth: number,
     boxHeight: number,
     isVertical: boolean,
-    customFontSize?: number  // カスタムフォントサイズパラメータを追加
+    customFontSize?: number // カスタムフォントサイズパラメータを追加
   ): number => {
-     // カスタムフォントサイズが設定されている場合はそれを返す
-  if (customFontSize !== undefined && customFontSize > 0) {
-    return customFontSize
-  }
+    // カスタムフォントサイズが設定されている場合はそれを返す
+    if (customFontSize !== undefined && customFontSize > 0) {
+      return customFontSize
+    }
 
     const padding = 2
     const availableWidth = boxWidth - padding * 2
@@ -1335,6 +1335,7 @@ const MeasurementPage = () => {
         if (box.id === boxId && measurements[measurementIndex]) {
           return {
             ...box,
+            index: measurementIndex,
             value: measurements[measurementIndex].value,
             isOutOfTolerance: measurements[measurementIndex].isOutOfTolerance,
             isManuallyEdited: false, // 自動転記フラグをリセット
@@ -1499,7 +1500,8 @@ const MeasurementPage = () => {
             formattedValue,
             box.width,
             box.height,
-            isVertical
+            isVertical,
+            box.fontSize
           )
           ctx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`
           ctx.fillStyle = box.isOutOfTolerance
@@ -1798,7 +1800,7 @@ const MeasurementPage = () => {
       MozUserDrag: 'none' as const,
       userDrag: 'none' as const,
     },
-    
+
     box: (
       isVertical: boolean,
       fontSize: number,
@@ -2094,24 +2096,25 @@ const MeasurementPage = () => {
       if (isSliderDragging) {
         return
       }
-      
+
       const target = e.target as HTMLElement
 
       // ボタン要素のチェックを追加
-    if (target.tagName === 'BUTTON' && target.closest('[data-slider-container="true"]')) {
-      return // スライダーコンテナ内のボタンは無視
-    }
-      
+      if (target.tagName === 'BUTTON' && target.closest('[data-slider-container="true"]')) {
+        return // スライダーコンテナ内のボタンは無視
+      }
+
       // input[type="range"]の親要素も含めてチェック
-      const isSliderInteraction = target.closest('input[type="range"]') || 
-                                  target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'range'
+      const isSliderInteraction =
+        target.closest('input[type="range"]') ||
+        (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'range')
       if (isSliderInteraction) {
         return
       }
-      
+
       hideContextMenu()
     }
-    
+
     if (contextMenu.visible) {
       // mousedownイベントも追加して早期に判定
       const handleMouseDown = (e: MouseEvent) => {
@@ -2120,17 +2123,17 @@ const MeasurementPage = () => {
           setIsSliderDragging(true)
         }
       }
-      
+
       const handleMouseUp = () => {
         setIsSliderDragging(false)
       }
-      
+
       setTimeout(() => {
         document.addEventListener('click', handleClickOutside)
         document.addEventListener('mousedown', handleMouseDown)
         document.addEventListener('mouseup', handleMouseUp)
       }, 100)
-      
+
       return () => {
         document.removeEventListener('click', handleClickOutside)
         document.removeEventListener('mousedown', handleMouseDown)
@@ -2145,11 +2148,11 @@ const MeasurementPage = () => {
         setIsSliderDragging(false)
       }
     }
-    
+
     // グローバルにmouseupを監視
     window.addEventListener('mouseup', handleGlobalMouseUp)
     window.addEventListener('touchend', handleGlobalMouseUp)
-    
+
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp)
       window.removeEventListener('touchend', handleGlobalMouseUp)
@@ -2190,11 +2193,11 @@ const MeasurementPage = () => {
         transform: scale(1.2);
       }
     `
-  
-    const styleSheet = document.createElement("style")
+
+    const styleSheet = document.createElement('style')
     styleSheet.textContent = sliderStyles
     document.head.appendChild(styleSheet)
-  
+
     return () => {
       if (document.head.contains(styleSheet)) {
         document.head.removeChild(styleSheet)
@@ -2221,7 +2224,7 @@ const MeasurementPage = () => {
                 ref={fileInputRef}
               />
               <button style={styles.uploadBtn} onClick={() => fileInputRef.current?.click()}>
-              📐 図面をアップロード
+                📐 図面をアップロード
               </button>
             </label>
 
@@ -2388,12 +2391,12 @@ const MeasurementPage = () => {
                     const formattedValue = formatValue(box.value, box.decimalPlaces)
                     const fontSize = box.value
                       ? calculateOptimalFontSize(
-                        formattedValue,
-                        box.width,
-                        box.height,
-                        isVertical,
-                        box.fontSize // カスタムフォントサイズを渡す
-                      )
+                          formattedValue,
+                          box.width,
+                          box.height,
+                          isVertical,
+                          box.fontSize // カスタムフォントサイズを渡す
+                        )
                       : 14
                     const isEditing = editingBoxId === box.id
 
@@ -2803,7 +2806,7 @@ const MeasurementPage = () => {
       {/* 右クリックメニュー */}
       {contextMenu.visible && (
         <div
-        data-context-menu="true"  // ⭐ 追加: 識別用のデータ属性
+          data-context-menu="true" // ⭐ 追加: 識別用のデータ属性
           style={{
             ...styles.contextMenu,
             left: `${contextMenu.x}px`,
@@ -2909,211 +2912,211 @@ const MeasurementPage = () => {
               )
             })}
           </div>
-     {/* フォントサイズ設定セクション（スライダー版） */}
-     <div
-  style={{
-    padding: '12px 16px',
-    background: '#fafafa',
-  }}
-  data-slider-container="true"
-  onClick={(e) => e.stopPropagation()}
-  onMouseDown={(e) => e.stopPropagation()}
-  onMouseUp={(e) => e.stopPropagation()}
->
-  <div
-    style={{
-      fontSize: '13px',
-      color: '#666',
-      marginBottom: '10px',
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    }}
-  >
-    <span>フォントサイズ:</span>
-    <span
-      style={{
-        fontWeight: 'bold',
-        color: '#333',
-        fontSize: '14px',
-      }}
-    >
-      {(() => {
-        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-        const fontSize = tempFontSize ?? currentBox?.fontSize
-        return fontSize ? `${fontSize}px` : '自動'
-      })()}
-    </span>
-  </div>
-
-  {/* 自動/手動切り替えボタン */}
-  <div style={{ marginBottom: '10px' }}>
-  <button
-  onClick={(e) => {
-    e.stopPropagation()
-    e.preventDefault() // 追加：デフォルト動作を防ぐ
-    const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-    if (currentBox) {
-      if (currentBox.fontSize === undefined) {
-        // 自動→手動に切り替え
-        const isVertical = currentBox.height > currentBox.width * 1.5
-        const formattedValue = formatValue(currentBox.value, currentBox.decimalPlaces)
-        const calculatedSize = calculateOptimalFontSize(
-          formattedValue || '0',
-          currentBox.width,
-          currentBox.height,
-          isVertical
-        )
-        changeFontSize(currentBox.id, calculatedSize)
-        setTempFontSize(calculatedSize)
-      } else {
-        // 手動→自動に切り替え
-        changeFontSize(currentBox.id, undefined)
-        setTempFontSize(null)
-      }
-    }
-    return false // 追加：イベントの伝播を完全に停止
-  }}
-  onMouseDown={(e) => {
-    e.stopPropagation()
-    e.preventDefault()
-  }}
-      style={{
-        width: '100%',
-        padding: '6px',
-        background: 'white',
-        border: '1px solid #ddd',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        fontSize: '12px',
-        marginBottom: '8px',
-      }}
-    >
-      {(() => {
-        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-        return currentBox?.fontSize === undefined 
-          ? '🔄 手動調整に切り替え' 
-          : '🔄 自動調整に戻す'
-      })()}
-    </button>
-  </div>
-
-  {/* スライダー（手動モードの時のみ有効） */}
-  <div style={{ position: 'relative' }}>
-    <input
-      type="range"
-      min="1"
-      max="100"
-      step="1"
-      value={(() => {
-        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-        
-        // tempFontSizeがある場合はそれを使用
-        if (tempFontSize !== null) return tempFontSize
-        
-        // fontSizeが設定されている場合はそれを使用
-        if (currentBox?.fontSize !== undefined) return currentBox.fontSize
-        
-        // それ以外は現在の計算値を使用
-        if (currentBox) {
-          const isVertical = currentBox.height > currentBox.width * 1.5
-          const formattedValue = formatValue(currentBox.value, currentBox.decimalPlaces)
-          return calculateOptimalFontSize(
-            formattedValue || '0',
-            currentBox.width,
-            currentBox.height,
-            isVertical
-          )
-        }
-        
-        return 14 // デフォルト値
-      })()}
-      onChange={(e) => {
-        e.stopPropagation()
-        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-        const newSize = parseInt(e.target.value)
-        
-        if (currentBox?.fontSize === undefined) {
-          // 自動モードから手動モードに切り替え
-          changeFontSize(contextMenu.boxId!, newSize)
-        } else {
-          // 既に手動モードの場合
-          changeFontSize(contextMenu.boxId!, newSize)
-        }
-        setTempFontSize(newSize)
-      }}
-      disabled={(() => {
-        const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-        return currentBox?.fontSize === undefined // 自動モードの時は無効
-      })()}
-      onMouseDown={(e) => {
-        e.stopPropagation()
-        setIsSliderDragging(true)
-      }}
-      onMouseUp={(e) => {
-        e.stopPropagation()
-        setIsSliderDragging(false)
-      }}
-      onTouchStart={(e) => {
-        e.stopPropagation()
-        setIsSliderDragging(true)
-      }}
-      onTouchEnd={(e) => {
-        e.stopPropagation()
-        setIsSliderDragging(false)
-      }}
-      onClick={(e) => e.stopPropagation()}
-      style={{
-        width: '100%',
-        height: '6px',
-        background: 'transparent',
-        outline: 'none',
-        cursor: (() => {
-          const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-          return currentBox?.fontSize === undefined ? 'not-allowed' : 'pointer'
-        })(),
-        opacity: (() => {
-          const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-          return currentBox?.fontSize === undefined ? 0.5 : 1
-        })(),
-        WebkitAppearance: 'none',
-        MozAppearance: 'none',
-        appearance: 'none',
-        position: 'relative',
-        zIndex: 10,
-      }}
-    />
-        {/* カスタムスライダートラック */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: 0,
-            right: 0,
-            height: '4px',
-            background: '#e0e0e0',
-            borderRadius: '2px',
-            transform: 'translateY(-50%)',
-            pointerEvents: 'none',
-          }}
-        >
+          {/* フォントサイズ設定セクション（スライダー版） */}
           <div
             style={{
-              position: 'absolute',
-              left: 0,
-              height: '100%',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: '2px',
-              width: `${(() => {
-                const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
-                const fontSize = tempFontSize ?? currentBox?.fontSize ?? 14
-                return ((fontSize - 1) / (101 - 1)) * 100
-              })()}%`,
+              padding: '12px 16px',
+              background: '#fafafa',
             }}
-          />
-        </div>
-      </div>
-    </div>
+            data-slider-container="true"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onMouseUp={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                fontSize: '13px',
+                color: '#666',
+                marginBottom: '10px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <span>フォントサイズ:</span>
+              <span
+                style={{
+                  fontWeight: 'bold',
+                  color: '#333',
+                  fontSize: '14px',
+                }}
+              >
+                {(() => {
+                  const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                  const fontSize = tempFontSize ?? currentBox?.fontSize
+                  return fontSize ? `${fontSize}px` : '自動'
+                })()}
+              </span>
+            </div>
+
+            {/* 自動/手動切り替えボタン */}
+            <div style={{ marginBottom: '10px' }}>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault() // 追加：デフォルト動作を防ぐ
+                  const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                  if (currentBox) {
+                    if (currentBox.fontSize === undefined) {
+                      // 自動→手動に切り替え
+                      const isVertical = currentBox.height > currentBox.width * 1.5
+                      const formattedValue = formatValue(currentBox.value, currentBox.decimalPlaces)
+                      const calculatedSize = calculateOptimalFontSize(
+                        formattedValue || '0',
+                        currentBox.width,
+                        currentBox.height,
+                        isVertical
+                      )
+                      changeFontSize(currentBox.id, calculatedSize)
+                      setTempFontSize(calculatedSize)
+                    } else {
+                      // 手動→自動に切り替え
+                      changeFontSize(currentBox.id, undefined)
+                      setTempFontSize(null)
+                    }
+                  }
+                  return false // 追加：イベントの伝播を完全に停止
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                }}
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  background: 'white',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  marginBottom: '8px',
+                }}
+              >
+                {(() => {
+                  const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                  return currentBox?.fontSize === undefined
+                    ? '🔄 手動調整に切り替え'
+                    : '🔄 自動調整に戻す'
+                })()}
+              </button>
+            </div>
+
+            {/* スライダー（手動モードの時のみ有効） */}
+            <div style={{ position: 'relative' }}>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={(() => {
+                  const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+
+                  // tempFontSizeがある場合はそれを使用
+                  if (tempFontSize !== null) return tempFontSize
+
+                  // fontSizeが設定されている場合はそれを使用
+                  if (currentBox?.fontSize !== undefined) return currentBox.fontSize
+
+                  // それ以外は現在の計算値を使用
+                  if (currentBox) {
+                    const isVertical = currentBox.height > currentBox.width * 1.5
+                    const formattedValue = formatValue(currentBox.value, currentBox.decimalPlaces)
+                    return calculateOptimalFontSize(
+                      formattedValue || '0',
+                      currentBox.width,
+                      currentBox.height,
+                      isVertical
+                    )
+                  }
+
+                  return 14 // デフォルト値
+                })()}
+                onChange={(e) => {
+                  e.stopPropagation()
+                  const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                  const newSize = parseInt(e.target.value)
+
+                  if (currentBox?.fontSize === undefined) {
+                    // 自動モードから手動モードに切り替え
+                    changeFontSize(contextMenu.boxId!, newSize)
+                  } else {
+                    // 既に手動モードの場合
+                    changeFontSize(contextMenu.boxId!, newSize)
+                  }
+                  setTempFontSize(newSize)
+                }}
+                disabled={(() => {
+                  const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                  return currentBox?.fontSize === undefined // 自動モードの時は無効
+                })()}
+                onMouseDown={(e) => {
+                  e.stopPropagation()
+                  setIsSliderDragging(true)
+                }}
+                onMouseUp={(e) => {
+                  e.stopPropagation()
+                  setIsSliderDragging(false)
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation()
+                  setIsSliderDragging(true)
+                }}
+                onTouchEnd={(e) => {
+                  e.stopPropagation()
+                  setIsSliderDragging(false)
+                }}
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '100%',
+                  height: '6px',
+                  background: 'transparent',
+                  outline: 'none',
+                  cursor: (() => {
+                    const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                    return currentBox?.fontSize === undefined ? 'not-allowed' : 'pointer'
+                  })(),
+                  opacity: (() => {
+                    const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                    return currentBox?.fontSize === undefined ? 0.5 : 1
+                  })(),
+                  WebkitAppearance: 'none',
+                  MozAppearance: 'none',
+                  appearance: 'none',
+                  position: 'relative',
+                  zIndex: 10,
+                }}
+              />
+              {/* カスタムスライダートラック */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: 0,
+                  right: 0,
+                  height: '4px',
+                  background: '#e0e0e0',
+                  borderRadius: '2px',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    height: '100%',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    borderRadius: '2px',
+                    width: `${(() => {
+                      const currentBox = boxes.find((b) => b.id === contextMenu.boxId)
+                      const fontSize = tempFontSize ?? currentBox?.fontSize ?? 14
+                      return ((fontSize - 1) / (101 - 1)) * 100
+                    })()}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
 
           {/* 既存の小数点設定 */}
           <div
