@@ -2214,8 +2214,28 @@ const MeasurementPage = () => {
       background: 'linear-gradient(135deg, #DDDDDD 10%, #888888 100%)',
       color: 'white',
       padding: '15px 20px',
-      textAlign: 'center' as const,
       flexShrink: 0,
+    },
+    headerButton: {
+      padding: '6px 14px',
+      borderRadius: '15px',
+      border: '2px solid rgba(81, 108, 167, 0.99)',
+      background: 'rgb(255, 255, 255)',
+      backdropFilter: 'blur(10px)',
+      color: 'black',
+      cursor: 'pointer',
+      fontWeight: '600',
+      fontFamily: '"Noto Sans JP", sans-serif',
+      fontSize: '13px',
+      transition: 'all 0.2s',
+      '&:hover': {
+        background: 'rgba(255, 255, 255, 0.2)',
+        transform: 'translateY(-1px)',
+      },
+      '&:disabled': {
+        cursor: 'not-allowed',
+        opacity: 0.5,
+      },
     },
     controls: {
       padding: '15px 20px',
@@ -2879,12 +2899,81 @@ const MeasurementPage = () => {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [history])
 
+  useEffect(() => {
+    const animationStyles = `
+      @keyframes fadeInSlide {
+        from {
+          opacity: 0;
+          transform: scale(0.95) translateY(-10px);  // わずかに縮小＋上から
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+    `
+
+    const styleSheet = document.createElement('style')
+    styleSheet.textContent = animationStyles
+    document.head.appendChild(styleSheet)
+
+    return () => {
+      if (document.head.contains(styleSheet)) {
+        document.head.removeChild(styleSheet)
+      }
+    }
+  }, [])
+
   return (
     <div style={styles.container}>
       <div style={styles.mainContainer}>
         <div style={styles.header}>
-          <h1 style={{ margin: '0', fontSize: '24px' }}>図面測定値転記システム</h1>
-          <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>CalypsoとZEISS両形式のPDFに対応</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* 左側：Undo/Redoボタン */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                style={{
+                  ...styles.headerButton,
+                  opacity: history.currentIndex > 0 ? 1 : 0.5,
+                }}
+                onClick={undo}
+                disabled={history.currentIndex <= 0}
+                title="元に戻す (Ctrl+Z)"
+              >
+                ↶ 元に戻す
+              </button>
+
+              <button
+                style={{
+                  ...styles.headerButton,
+                  opacity: history.currentIndex < history.entries.length - 1 ? 1 : 0.5,
+                }}
+                onClick={redo}
+                disabled={history.currentIndex >= history.entries.length - 1}
+                title="やり直す (Ctrl+Y)"
+              >
+                ↷ やり直す
+              </button>
+
+              <button
+                style={styles.headerButton}
+                onClick={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}
+              >
+                📜 履歴 ({history.entries.length})
+              </button>
+            </div>
+
+            {/* 中央：タイトル */}
+            <div style={{ textAlign: 'center', flex: 1 }}>
+              <h1 style={{ margin: '0', fontSize: '24px' }}>図面測定値転記システム</h1>
+              <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>
+                CalypsoとZEISS両形式のPDFに対応
+              </p>
+            </div>
+
+            {/* 右側：スペース確保（将来の拡張用） */}
+            <div style={{ width: '300px' }}></div>
+          </div>
         </div>
 
         <div style={styles.controls}>
@@ -2999,38 +3088,6 @@ const MeasurementPage = () => {
               onClick={exportResult}
             >
               📄 PDFで保存
-            </button>
-
-            {/* 履歴管理ボタン */}
-            <button
-              style={{
-                ...styles.actionBtn(false),
-                opacity: history.currentIndex > 0 ? 1 : 0.5,
-              }}
-              onClick={undo}
-              disabled={history.currentIndex <= 0}
-              title="元に戻す (Ctrl+Z)"
-            >
-              ↶ 元に戻す
-            </button>
-
-            <button
-              style={{
-                ...styles.actionBtn(false),
-                opacity: history.currentIndex < history.entries.length - 1 ? 1 : 0.5,
-              }}
-              onClick={redo}
-              disabled={history.currentIndex >= history.entries.length - 1}
-              title="やり直す (Ctrl+Y)"
-            >
-              ↷ やり直す
-            </button>
-
-            <button
-              style={styles.actionBtn(isHistoryPanelOpen)}
-              onClick={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}
-            >
-              📜 履歴 ({history.entries.length})
             </button>
 
             {/* 自動保存インジケーター（オプション） */}
@@ -3963,10 +4020,10 @@ const MeasurementPage = () => {
         <div
           style={{
             position: 'fixed',
-            right: '20px',
-            top: '100px',
-            width: '300px',
-            maxHeight: '500px',
+            right: '1100px', // 右端からの距離を調整
+            top: '10px', // ヘッダーと被らないように調整
+            width: '280px', // 幅を少し狭く
+            maxHeight: '70vh', // 画面の高さに対する割合で指定
             background: 'white',
             borderRadius: '10px',
             boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
@@ -3974,6 +4031,9 @@ const MeasurementPage = () => {
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
+            fontFamily: '"Noto Sans JP", sans-serif',
+            // アニメーション追加でスムーズに表示
+            animation: 'fadeInSlide 0.3s ease',
           }}
         >
           <div
