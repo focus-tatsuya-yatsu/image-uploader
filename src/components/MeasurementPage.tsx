@@ -7,6 +7,7 @@ import NextImage from 'next/image'
 import ResponsiveHeader from './ResponsiveHeader'
 import ResponsiveHistoryPanel from './ResponsiveHistoryPanel'
 import styles from '../app/responsive.module.css'
+import { measurementAPI } from '@/lib/api-client'
 
 // 型定義
 interface Box {
@@ -555,6 +556,9 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     maxEntries: 50,
   })
   const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false)
+const [isSavingToCloud, setIsSavingToCloud] = useState(false)
+const [savedWorkStates, setSavedWorkStates] = useState<any[]>([])
+const [showWorkStatesList, setShowWorkStatesList] = useState(false)
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1934,104 +1938,129 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   }
 
   // 実際の保存処理を行う関数
-  const performWorkStateSave = async () => {
-    setIsWorkStateSaving(true)
+  // MeasurementPage.tsx内のperformWorkStateSave関数を以下に置き換え
 
+const performWorkStateSave = useCallback(async () => {
+  // workStateSaveFileNameの確認（正しい変数名）
+  if (!workStateSaveFileName) {
+    alert('ファイル名を入力してください')
+    return
+  }
+  
+  // settingsオブジェクトを作成
+  const settings = {
+    defaultDecimalPlaces,
+    minBoxSize,
+    minFontSize,
+    textColorMode,
+    showBoxNumbers,
+    showDeleteButtons,
+  }
+  
+  // クラウド保存するか確認
+  if (window.confirm('クラウドに保存しますか？（「いいえ」を選ぶとローカルに保存します）')) {
+    setIsSavingToCloud(true)
+    
     try {
-      const saveData: SaveData = {
-        version: '1.0.0',
-        savedAt: new Date().toISOString(),
-        drawingImage,
+      const saveData = {
+        fileName: workStateSaveFileName,  // 正しい変数名
         boxes,
         measurements,
         viewTransform,
-        settings: {
-          defaultDecimalPlaces,
-          minBoxSize,
-          minFontSize,
-          textColorMode,
-          showBoxNumbers,
-          showDeleteButtons,
-        },
+        settings,  // 上で作成したsettings
+        drawingImage: drawingImage || '',  // 現在の画像
+        version: '1.0.0'
       }
-
-      const dataStr = JSON.stringify(saveData, null, 2)
-      const dataBlob = new Blob([dataStr], { type: 'application/json' })
-
-      // ファイル名を決定
-      const getDefaultFileName = () => {
-        const now = new Date()
-        const dateStr = now.toISOString().slice(0, 10)
-        const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
-        return `図面_${dateStr}_${timeStr}`
-      }
-
-      const finalFileName = workStateSaveFileName || getDefaultFileName()
-
-      // File System Access APIをサポートしているか確認
-      if ('showSaveFilePicker' in window) {
-        try {
-          // ネイティブの保存ダイアログを表示
-          const handle = await (window as any).showSaveFilePicker({
-            suggestedName: `${finalFileName}.json`,
-            types: [
-              {
-                description: 'JSONファイル',
-                accept: { 'application/json': ['.json'] },
-              },
-            ],
-            startIn: 'downloads',
-          })
-
-          const writable = await handle.createWritable()
-          await writable.write(dataBlob)
-          await writable.close()
-
-          // 成功メッセージ
-          alert('✅ 作業状態を保存しました！\n後で「作業状態を読み込む」から再開できます。')
-        } catch (err: any) {
-          // ユーザーがキャンセルした場合
-          if (err.name === 'AbortError') {
-            console.log('保存がキャンセルされました')
-          } else {
-            console.error('保存エラー:', err)
-            // エラー時はフォールバック
-            const url = URL.createObjectURL(dataBlob)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = `${finalFileName}.json`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-
-            alert('⚠️ ネイティブ保存に失敗したため、通常のダウンロードで保存しました。')
-          }
-        }
-      } else {
-        // File System Access API非対応のブラウザ
-        const url = URL.createObjectURL(dataBlob)
-        const link = document.createElement('a')
-        link.href = url
-        link.download = `${finalFileName}.json`
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(url)
-
-        alert('📥 作業状態をダウンロードフォルダに保存しました！')
-      }
-
-      // ダイアログを閉じる
-      setShowWorkStateSaveDialog(false)
-      setWorkStateSaveFileName('')
+      
+      const result = await measurementAPI.saveWorkState(saveData)
+      
+      alert('クラウドに保存しました')
+      setShowWorkStateSaveDialog(false)  // 正しい関数名
+      setWorkStateSaveFileName('')  // ファイル名をリセット
     } catch (error) {
-      console.error('作業状態の保存エラー:', error)
-      alert('❌ 作業状態の保存に失敗しました。')
+      console.error('Cloud save failed:', error)
+      alert('クラウド保存に失敗しました')
     } finally {
-      setIsWorkStateSaving(false)
+      setIsSavingToCloud(false)
+    }
+  } else {
+    // ローカル保存処理（既存のコード）
+    const saveData = {
+      fileName: workStateSaveFileName,
+      boxes,
+      measurements,
+      viewTransform,
+      settings
+    }
+    
+    const dataStr = new Date().toISOString().slice(0, 10)
+    const timeStr = new Date().toISOString().slice(11, 19).replace(/:/g, '-')
+    const finalFileName = workStateSaveFileName + '_' + dataStr + '_' + timeStr
+    
+    const dataBlob = new Blob([JSON.stringify(saveData)], { type: 'application/json' })
+    const url = URL.createObjectURL(dataBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${finalFileName}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    
+    alert('ローカルに保存しました')
+    setShowWorkStateSaveDialog(false)  // 正しい関数名
+    setWorkStateSaveFileName('')
+  }
+}, [workStateSaveFileName, boxes, measurements, viewTransform, drawingImage, defaultDecimalPlaces, minBoxSize, minFontSize, textColorMode, showBoxNumbers, showDeleteButtons])  // 正しい依存配列
+
+  // 保存済みリストを表示する関数を追加
+const loadSavedWorkStates = async () => {
+  try {
+    const list = await measurementAPI.loadWorkStates()
+    setSavedWorkStates(list)
+    setShowWorkStatesList(true)
+  } catch (error) {
+    console.error('Failed to load saved states:', error)
+    alert('保存済みデータの取得に失敗しました')
+  }
+}
+
+// クラウドから読み込む関数を追加
+const loadFromCloud = async (workId: string) => {
+  if (boxes.length > 0 || measurements.length > 0) {
+    if (!confirm('現在の作業内容が失われます。続行しますか？')) {
+      return
     }
   }
+
+  try {
+    const data = await measurementAPI.loadWorkState(workId)
+    
+    // 状態を復元
+    setDrawingImage(data.drawingImage)
+    setBoxes(data.boxes || [])
+    setMeasurements(data.measurements || [])
+    setViewTransform(data.viewTransform || { scale: 1, translateX: 0, translateY: 0 })
+    
+    if (data.settings) {
+      setDefaultDecimalPlaces(data.settings.defaultDecimalPlaces)
+      setMinBoxSize(data.settings.minBoxSize)
+      setMinFontSize(data.settings.minFontSize)
+      setTextColorMode(data.settings.textColorMode)
+      setShowBoxNumbers(data.settings.showBoxNumbers)
+      setShowDeleteButtons(data.settings.showDeleteButtons)
+    }
+    
+    if (data.measurements && data.measurements.length > 0) {
+      setPdfLoaded(true)
+    }
+    
+    alert(`✅ クラウドから読み込みました！\nファイル名: ${data.fileName}`)
+    setShowWorkStatesList(false)
+    
+  } catch (error) {
+    console.error('Load from cloud failed:', error)
+    alert('クラウドからの読み込みに失敗しました')
+  }
+}
 
   // 作業状態を読み込む関数
   const importWorkState = async (file: File) => {
@@ -3066,6 +3095,17 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
               📄 PDFで保存
             </button>
 
+<button
+  style={{
+    ...styles.uploadBtn,
+    background: 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)',
+  }}
+  onClick={loadSavedWorkStates}
+  title="クラウドから保存済みデータを読み込む"
+>
+  ☁️ クラウドから読み込む
+</button>
+
             {/* 自動保存インジケーター（オプション） */}
             {lastAutoSave && (
               <div
@@ -3982,6 +4022,170 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
         isSaving={isSaving}
         performSave={performSave}
       />
+      {/* 保存済みリスト表示用モーダル - 履歴パネルの後に追加 */}
+{showWorkStatesList && (
+  <div
+    style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.6)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10001,
+      backdropFilter: 'blur(5px)',
+    }}
+  >
+    <div
+      style={{
+        background: 'white',
+        borderRadius: '15px',
+        padding: '30px',
+        width: '600px',
+        maxWidth: '90%',
+        maxHeight: '80vh',
+        overflowY: 'auto',
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+        fontFamily: '"Noto Sans JP", sans-serif',
+      }}
+    >
+      <h2 style={{ 
+        marginBottom: '20px',
+        color: '#333',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+      }}>
+        ☁️ クラウドに保存されたファイル
+      </h2>
+
+      {savedWorkStates.length === 0 ? (
+        <div style={{ 
+          textAlign: 'center',
+          padding: '40px',
+          color: '#999'
+        }}>
+          <p>保存済みのデータはありません</p>
+        </div>
+      ) : (
+        <div style={{ marginBottom: '20px' }}>
+          {savedWorkStates.map((state: any) => (
+            <div
+              key={state.workId}
+              style={{
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                padding: '15px',
+                marginBottom: '10px',
+                background: '#f9f9f9',
+                transition: 'all 0.2s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f0f0f0'
+                e.currentTarget.style.borderColor = '#667eea'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = '#f9f9f9'
+                e.currentTarget.style.borderColor = '#e0e0e0'
+              }}
+            >
+              <div style={{ 
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    marginBottom: '5px'
+                  }}>
+                    {state.fileName}
+                  </div>
+                  <div style={{ 
+                    fontSize: '12px',
+                    color: '#666'
+                  }}>
+                    保存日時: {new Date(state.savedAt).toLocaleString('ja-JP')}
+                  </div>
+                  {state.boxCount !== undefined && (
+                    <div style={{ 
+                      fontSize: '12px',
+                      color: '#666',
+                      marginTop: '3px'
+                    }}>
+                      ボックス数: {state.boxCount} / 測定値数: {state.measurementCount || 0}
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => loadFromCloud(state.workId)}
+                  style={{
+                    padding: '8px 20px',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '14px',
+                    fontFamily: '"Noto Sans JP", sans-serif',
+                    transition: 'all 0.2s',
+                    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
+                  }}
+                >
+                  読み込む
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ 
+        display: 'flex',
+        justifyContent: 'flex-end',
+        marginTop: '20px'
+      }}>
+        <button
+          onClick={() => setShowWorkStatesList(false)}
+          style={{
+            padding: '10px 24px',
+            border: '2px solid #e0e0e0',
+            borderRadius: '8px',
+            background: 'white',
+            color: '#666',
+            cursor: 'pointer',
+            fontWeight: '500',
+            fontSize: '14px',
+            fontFamily: '"Noto Sans JP", sans-serif',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#f5f5f5'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'white'
+          }}
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {/* 作業状態保存ダイアログ */}
       <WorkStateSaveDialog
         showDialog={showWorkStateSaveDialog}

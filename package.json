@@ -14,8 +14,11 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.890.0",
+    "@aws-sdk/lib-dynamodb": "^3.890.0",
     "@types/jspdf": "^2.0.0",
     "aws-amplify": "^6.15.6",
+    "dotenv": "^17.2.2",
     "file-type": "^18.5.0",
     "framer-motion": "^10.16.0",
     "html-to-image": "^1.11.13",
@@ -25,12 +28,14 @@
     "pdfjs-dist": "^5.4.54",
     "react": "^18",
     "react-dom": "^18",
-    "utif": "^3.1.0"
+    "utif": "^3.1.0",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/uuid": "^11.0.0",
     "@typescript-eslint/eslint-plugin": "^8.40.0",
     "@typescript-eslint/parser": "^8.40.0",
     "eslint": "^8",
