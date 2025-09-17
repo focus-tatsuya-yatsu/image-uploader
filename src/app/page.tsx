@@ -3,18 +3,27 @@
 import { useAuth } from '@/providers/AuthProvider'
 import MeasurementPage from '@/components/MeasurementPage'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function HomePage() {
   const { user, logout, isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
+  const [isMobile, setIsMobile] = useState(false)
 
-  // 認証チェック（修正版）
+  // 画面サイズの監視
   useEffect(() => {
-    // ローディング中は何もしない
-    if (isLoading) return
+    const checkScreenSize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
 
-    // 未認証の場合のみリダイレクト
+    checkScreenSize()
+    window.addEventListener('resize', checkScreenSize)
+    return () => window.removeEventListener('resize', checkScreenSize)
+  }, [])
+
+  // 認証チェック
+  useEffect(() => {
+    if (isLoading) return
     if (!isAuthenticated) {
       router.push('/login')
     }
@@ -56,50 +65,15 @@ export default function HomePage() {
     )
   }
 
-  // 未認証（ローディング完了後）
   if (!isAuthenticated) {
     return null
   }
 
-  // 認証済み
+  // ⭐ ログアウトボタンを削除して、MeasurementPageに任せる
   return (
     <>
-      <div
-        style={{
-          position: 'fixed',
-          top: '40px',
-          right: '180px',
-          zIndex: 10000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          background: 'white',
-          padding: '8px 16px',
-          borderRadius: '25px',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-        }}
-      >
-        <span style={{ fontSize: '14px', color: '#666' }}>
-          👤 {user?.signInDetails?.loginId || user?.username || 'ユーザー'}
-        </span>
-        <button
-          onClick={logout}
-          style={{
-            padding: '6px 12px',
-            background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '15px',
-            fontSize: '14px',
-            fontWeight: '600',
-            cursor: 'pointer',
-          }}
-        >
-          ログアウト
-        </button>
-      </div>
-
-      <MeasurementPage />
+      {/* ログアウトボタンは削除 */}
+      <MeasurementPage user={user} logout={logout} isMobile={isMobile} />
 
       <style jsx>{`
         @keyframes spin {

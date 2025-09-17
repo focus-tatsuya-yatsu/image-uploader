@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/providers/AuthProvider'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import '@/lib/amplify-config'
 
 export default function LoginPage() {
@@ -162,7 +163,7 @@ export default function LoginPage() {
           </div>
 
           {/* パスワード入力 */}
-          <div style={{ marginBottom: '30px' }}>
+          <div style={{ marginBottom: '10px' }}>
             <label
               style={{
                 display: 'block',
@@ -224,6 +225,27 @@ export default function LoginPage() {
                 {showPassword ? '👁️' : '👁️‍🗨️'}
               </button>
             </div>
+          </div>
+
+          {/* パスワードを忘れた場合のリンク */}
+          <div style={{ textAlign: 'right', marginBottom: '20px' }}>
+            <Link
+              href="/forgot-password"
+              style={{
+                color: '#667eea',
+                fontSize: '13px',
+                textDecoration: 'none',
+                fontWeight: '500',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.textDecoration = 'underline'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.textDecoration = 'none'
+              }}
+            >
+              パスワードをお忘れですか？
+            </Link>
           </div>
 
           {/* ログインボタン */}
@@ -302,6 +324,9 @@ export default function LoginPage() {
         >
           <p>© 2025 測定システム. All rights reserved.</p>
           <p style={{ marginTop: '5px' }}>ログインに問題がある場合は管理者にお問い合わせください</p>
+          <p style={{ marginTop: '10px', color: '#666' }}>
+            初回ログイン時は新しいパスワードの設定が必要です
+          </p>
         </div>
       </div>
 

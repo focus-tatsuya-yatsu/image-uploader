@@ -1,0 +1,294 @@
+/* responsive.module.css */
+
+/* デスクトップファースト */
+.container {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+/* タブレット対応 */
+@media (max-width: 1024px) {
+  .container {
+    padding: 0 15px;
+  }
+
+  .headerTitle {
+    font-size: 20px !important;
+  }
+
+  .headerSubtitle {
+    font-size: 13px !important;
+  }
+
+  .controlButton {
+    font-size: 12px !important;
+    padding: 5px 10px !important;
+  }
+
+  .mainContent {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+
+  .panel {
+    min-height: 400px;
+  }
+
+  /* ボタングループを2行に分割 */
+  .controlsLeft {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 10px;
+  }
+
+  /* ヘッダーの簡略化 */
+  .header {
+    padding: 10px !important;
+  }
+
+  .headerTitle {
+    font-size: 16px !important;
+  }
+
+  .headerSubtitle {
+    font-size: 11px !important;
+  }
+
+  /* コントロールパネルをスクロール可能に */
+  .controls {
+    padding: 10px !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .controlsLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .controlButton {
+    font-size: 11px !important;
+    padding: 8px 12px !important;
+    width: 100%;
+    min-width: unset !important;
+  }
+
+  /* メインコンテンツを単一カラムに */
+  .mainContent {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+    padding: 10px !important;
+  }
+
+  /* パネルの高さ調整 */
+  .panel {
+    min-height: 300px;
+    max-height: 500px;
+  }
+
+  .canvasContainer {
+    height: 400px !important;
+  }
+
+  /* 測定結果リストの高さ */
+  .measurementList {
+    max-height: 300px !important;
+  }
+
+  /* ステータスバーを縦並びに */
+  .statusContent {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  /* 自動転記ボタンを下部固定 */
+  .autoAssignButton {
+    position: fixed !important;
+    bottom: 20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100% - 40px) !important;
+    max-width: 300px !important;
+    z-index: 100 !important;
+  }
+
+  /* モバイル用ハンバーガーメニュー */
+  .mobileMenuButton {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 10002;
+    width: 44px;
+    height: 44px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .mobileMenu {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 280px;
+    max-width: 80vw;
+    height: 100vh;
+    background: white;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+    z-index: 10001;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+  }
+
+  .mobileMenu.open {
+    transform: translateX(0);
+  }
+
+  /* モバイル用オーバーレイ */
+  .mobileOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .mobileOverlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ツールチップの調整 */
+  .tooltip {
+    font-size: 12px !important;
+    padding: 8px 12px !important;
+    max-width: 200px !important;
+  }
+
+  /* 右クリックメニューを全画面に */
+  .contextMenu {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-height: 70vh !important;
+    border-radius: 20px 20px 0 0 !important;
+  }
+
+  /* 使い方ガイドを折りたたみ可能に */
+  .guideContent {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+}
+
+/* 小型モバイル対応（iPhone SE等） */
+@media (max-width: 375px) {
+  .headerTitle {
+    font-size: 14px !important;
+  }
+
+  .headerSubtitle {
+    display: none !important;
+  }
+
+  .controlButton {
+    font-size: 10px !important;
+    padding: 6px 8px !important;
+  }
+
+  .canvasContainer {
+    height: 300px !important;
+  }
+}
+
+/* タッチデバイス用の調整 */
+@media (hover: none) and (pointer: coarse) {
+  /* タッチターゲットを大きく */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* ホバー効果を無効化 */
+  button:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* スクロールをスムーズに */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ダークモード対応（オプション） */
+@media (prefers-color-scheme: dark) {
+  .container {
+    /* ダークモード用のスタイルをここに追加 */
+  }
+}
+
+/* 印刷用スタイル */
+@media print {
+  .controls,
+  .statusBar,
+  .guideSection,
+  .mobileMenuButton,
+  .deleteBtn {
+    display: none !important;
+  }
+
+  .mainContent {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* アニメーション */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}

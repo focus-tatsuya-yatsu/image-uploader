@@ -4,6 +4,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import jsPDF from 'jspdf'
 import UTIF from 'utif'
 import NextImage from 'next/image'
+import ResponsiveHeader from './ResponsiveHeader'
+import ResponsiveHistoryPanel from './ResponsiveHistoryPanel'
+import styles from '../app/responsive.module.css'
 
 // 型定義
 interface Box {
@@ -79,6 +82,12 @@ interface HistoryState {
   entries: HistoryEntry[]
   currentIndex: number
   maxEntries: number // デフォルト50件
+}
+
+interface MeasurementPageProps {
+  user?: any
+  logout?: () => void
+  isMobile?: boolean
 }
 
 // SaveDialogコンポーネント
@@ -482,7 +491,11 @@ const WorkStateSaveDialog: React.FC<{
 })
 
 // メインコンポーネント
-const MeasurementPage = () => {
+const MeasurementPage: React.FC<MeasurementPageProps> = ({
+  user = null, // デフォルト値を設定
+  logout = () => {}, // デフォルト値を設定
+  isMobile = false, // デフォルト値を設定
+}) => {
   // State管理
   const [boxes, setBoxes] = useState<Box[]>([])
   const [measurements, setMeasurements] = useState<Measurement[]>([])
@@ -2927,54 +2940,17 @@ const MeasurementPage = () => {
   return (
     <div style={styles.container}>
       <div style={styles.mainContainer}>
-        <div style={styles.header}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            {/* 左側：Undo/Redoボタン */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                style={{
-                  ...styles.headerButton,
-                  opacity: history.currentIndex > 0 ? 1 : 0.5,
-                }}
-                onClick={undo}
-                disabled={history.currentIndex <= 0}
-                title="元に戻す (Ctrl+Z)"
-              >
-                ↶ 元に戻す
-              </button>
-
-              <button
-                style={{
-                  ...styles.headerButton,
-                  opacity: history.currentIndex < history.entries.length - 1 ? 1 : 0.5,
-                }}
-                onClick={redo}
-                disabled={history.currentIndex >= history.entries.length - 1}
-                title="やり直す (Ctrl+Y)"
-              >
-                ↷ やり直す
-              </button>
-
-              <button
-                style={styles.headerButton}
-                onClick={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}
-              >
-                📜 履歴 ({history.entries.length})
-              </button>
-            </div>
-
-            {/* 中央：タイトル */}
-            <div style={{ textAlign: 'center', flex: 1 }}>
-              <h1 style={{ margin: '0', fontSize: '24px' }}>図面測定値転記システム</h1>
-              <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>
-                CalypsoとZEISS両形式のPDFに対応
-              </p>
-            </div>
-
-            {/* 右側：スペース確保（将来の拡張用） */}
-            <div style={{ width: '300px' }}></div>
-          </div>
-        </div>
+        <ResponsiveHeader
+          user={user}
+          logout={logout}
+          undo={undo}
+          redo={redo}
+          canUndo={history.currentIndex > 0}
+          canRedo={history.currentIndex < history.entries.length - 1}
+          historyCount={history.entries.length}
+          onHistoryToggle={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}
+          isHistoryOpen={isHistoryPanelOpen}
+        />
 
         <div style={styles.controls}>
           <div style={styles.controlsLeft}>
