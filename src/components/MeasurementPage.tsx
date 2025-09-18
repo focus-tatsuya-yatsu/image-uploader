@@ -1984,30 +1984,75 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
         setIsSavingToCloud(false)
       }
     } else {
-      // ローカル保存処理（既存のコード）
-      const saveData = {
-        fileName: workStateSaveFileName,
-        boxes,
-        measurements,
-        viewTransform,
-        settings,
+      // --- ここからローカル保存処理 ---
+      setIsWorkStateSaving(true) // 保存中フラグを立てる
+
+      try {
+        const saveData = {
+          version: '1.0.0',
+          savedAt: new Date().toISOString(),
+          drawingImage,
+          boxes,
+          measurements,
+          viewTransform,
+          settings,
+        }
+
+        const finalFileName =
+          workStateSaveFileName || `図面_${new Date().toISOString().slice(0, 10)}`
+        const dataBlob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' })
+
+        // File System Access APIが使えるかチェック
+        if ('showSaveFilePicker' in window) {
+          try {
+            // ネイティブの保存ダイアログを表示
+            const handle = await (window as any).showSaveFilePicker({
+              suggestedName: `${finalFileName}.json`,
+              types: [
+                {
+                  description: 'JSONファイル',
+                  accept: { 'application/json': ['.json'] },
+                },
+              ],
+            })
+
+            // ファイルに書き込み
+            const writable = await handle.createWritable()
+            await writable.write(dataBlob)
+            await writable.close()
+
+            alert('✅ ファイルを保存しました！')
+          } catch (err: any) {
+            // ユーザーがダイアログをキャンセルした場合のエラーは無視
+            if (err.name === 'AbortError') {
+              console.log('ローカル保存がキャンセルされました。')
+            } else {
+              console.error('ファイル保存エラー:', err)
+              throw err // その他のエラーは投げる
+            }
+          }
+        } else {
+          // APIが使えない古いブラウザのためのフォールバック（従来のダウンロード処理）
+          const url = URL.createObjectURL(dataBlob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = `${finalFileName}.json`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          URL.revokeObjectURL(url)
+          alert('📥 ファイルをダウンロードフォルダに保存しました！')
+        }
+
+        // 成功したらダイアログを閉じてファイル名をリセット
+        setShowWorkStateSaveDialog(false)
+        setWorkStateSaveFileName('')
+      } catch (error) {
+        console.error('ローカル保存処理中にエラーが発生しました:', error)
+        alert('❌ ローカル保存に失敗しました。')
+      } finally {
+        setIsWorkStateSaving(false) // 保存中フラグを解除
       }
-
-      const dataStr = new Date().toISOString().slice(0, 10)
-      const timeStr = new Date().toISOString().slice(11, 19).replace(/:/g, '-')
-      const finalFileName = workStateSaveFileName + '_' + dataStr + '_' + timeStr
-
-      const dataBlob = new Blob([JSON.stringify(saveData)], { type: 'application/json' })
-      const url = URL.createObjectURL(dataBlob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${finalFileName}.json`
-      link.click()
-      URL.revokeObjectURL(url)
-
-      alert('ローカルに保存しました')
-      setShowWorkStateSaveDialog(false) // 正しい関数名
-      setWorkStateSaveFileName('')
     }
   }, [
     workStateSaveFileName,

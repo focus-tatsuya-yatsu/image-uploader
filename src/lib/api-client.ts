@@ -1,5 +1,3 @@
-// src/lib/api-client.ts
-
 import { fetchAuthSession } from '@aws-amplify/auth'
 import { getCurrentUser } from '@aws-amplify/auth'
 
@@ -17,22 +15,14 @@ class MeasurementAPI {
   private apiEndpoint: string
 
   constructor() {
-    // 環境変数からAPIエンドポイントを取得
-    // 本番: API GatewayのURL
-    // 開発: ローカルのNext.js APIルート
-    this.apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || 'http://localhost:3001'
-
+    this.apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || ''
     console.log('API Endpoint:', this.apiEndpoint)
   }
 
   private async getAuthToken(): Promise<string> {
     try {
       const session = await fetchAuthSession()
-      const token = session.tokens?.idToken?.toString()
-      if (!token) {
-        throw new Error('No token available')
-      }
-      return token
+      return session.tokens?.idToken?.toString() || ''
     } catch (error) {
       console.error('Failed to get auth token:', error)
       throw new Error('認証エラー')
@@ -54,11 +44,15 @@ class MeasurementAPI {
       const userId = await this.getCurrentUserId()
       const token = await this.getAuthToken()
 
-      const response = await fetch(`${this.apiEndpoint}/workstates/save`, {
+      // /workstates に POSTする（/workstates/saveではない）
+      const url = `${this.apiEndpoint}/workstates`
+      console.log('Saving to:', url)
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: token,
         },
         body: JSON.stringify({
           userId,
@@ -66,16 +60,17 @@ class MeasurementAPI {
         }),
       })
 
+      const responseText = await response.text()
+      console.log('Response status:', response.status)
+      console.log('Response:', responseText)
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `保存に失敗しました: ${response.status}`)
+        throw new Error(`保存失敗: ${response.status} - ${responseText}`)
       }
 
-      const result = await response.json()
-      console.log('Save successful:', result)
-      return result
+      return JSON.parse(responseText)
     } catch (error) {
-      console.error('Save work state error:', error)
+      console.error('Save error:', error)
       throw error
     }
   }
@@ -85,53 +80,53 @@ class MeasurementAPI {
       const userId = await this.getCurrentUserId()
       const token = await this.getAuthToken()
 
-      const response = await fetch(
-        `${this.apiEndpoint}/workstates/load?userId=${encodeURIComponent(userId)}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
+      // /workstates に GETする
+      const url = `${this.apiEndpoint}/workstates?userId=${encodeURIComponent(userId)}`
+      console.log('Loading from:', url)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: token,
+        },
+      })
+
+      const responseText = await response.text()
+      console.log('Load response:', responseText)
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `読み込みに失敗しました: ${response.status}`)
+        throw new Error(`読み込み失敗: ${response.status} - ${responseText}`)
       }
 
-      const result = await response.json()
-      console.log('Loaded work states:', result)
-      return Array.isArray(result) ? result : []
+      const result = JSON.parse(responseText)
+      return result.data || [] // resultの中からdata配列を取り出して返す
     } catch (error) {
-      console.error('Load work states error:', error)
+      console.error('Load error:', error)
       throw error
     }
   }
 
   async loadWorkState(workId: string) {
     try {
-      const userId = await this.getCurrentUserId()
       const token = await this.getAuthToken()
 
-      const response = await fetch(
-        `${this.apiEndpoint}/workstates/load?userId=${encodeURIComponent(userId)}&workId=${encodeURIComponent(workId)}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
+      // /workstates/{workId} に GETする
+      const url = `${this.apiEndpoint}/workstates/${encodeURIComponent(workId)}`
+      console.log('Loading work state:', url)
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: token,
+        },
+      })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        throw new Error(errorData.error || `読み込みに失敗しました: ${response.status}`)
+        throw new Error(`読み込み失敗: ${response.status}`)
       }
 
-      const result = await response.json()
-      console.log('Loaded work state:', result)
-      return result
+      const result = await response.json() // ← 一度、小包を変数に入れる
+      return result.data // ← 小包の中から "data" を取り出して返す
     } catch (error) {
       console.error('Load work state error:', error)
       throw error
