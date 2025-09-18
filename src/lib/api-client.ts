@@ -3,7 +3,6 @@
 import { fetchAuthSession } from '@aws-amplify/auth'
 import { getCurrentUser } from '@aws-amplify/auth'
 
-// 型定義
 interface SaveWorkStateData {
   fileName: string
   boxes: any[]
@@ -14,28 +13,16 @@ interface SaveWorkStateData {
   version: string
 }
 
-interface SaveWorkStateResult {
-  workId?: string
-  success?: boolean
-  savedAt?: string
-  [key: string]: any
-}
-
 class MeasurementAPI {
   private apiEndpoint: string
-  private useLocalApi: boolean
 
   constructor() {
-    // 環境に応じてエンドポイントを切り替え
-    this.apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || ''
-    // ローカル開発環境かプロダクションかを判定
-    this.useLocalApi = !this.apiEndpoint || process.env.NODE_ENV === 'development'
+    // 環境変数からAPIエンドポイントを取得
+    // 本番: API GatewayのURL
+    // 開発: ローカルのNext.js APIルート
+    this.apiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT || 'http://localhost:3001'
 
-    if (this.useLocalApi) {
-      console.log('Using local Next.js API routes')
-    } else {
-      console.log('Using AWS API Gateway:', this.apiEndpoint)
-    }
+    console.log('API Endpoint:', this.apiEndpoint)
   }
 
   private async getAuthToken(): Promise<string> {
@@ -62,59 +49,31 @@ class MeasurementAPI {
     }
   }
 
-  async saveWorkState(saveData: SaveWorkStateData): Promise<SaveWorkStateResult> {
+  async saveWorkState(saveData: SaveWorkStateData) {
     try {
-      // ローカルAPIを使用する場合
-      if (this.useLocalApi) {
-        const userId = await this.getCurrentUserId()
+      const userId = await this.getCurrentUserId()
+      const token = await this.getAuthToken()
 
-        // 画像データが大きすぎる場合は警告
-        const dataToSave = { ...saveData }
-        if (dataToSave.drawingImage && dataToSave.drawingImage.length > 1000000) {
-          console.warn('画像データが大きすぎるため、圧縮または除外します')
-          dataToSave.drawingImage = '' // 一時的に画像を除外
-        }
+      const response = await fetch(`${this.apiEndpoint}/workstates/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          userId,
+          ...saveData,
+        }),
+      })
 
-        const response = await fetch('/api/workstates/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId,
-            ...dataToSave,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(errorData.error || `保存に失敗しました: ${response.status}`)
-        }
-
-        const result = await response.json()
-        console.log('Save successful:', result)
-        return result
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `保存に失敗しました: ${response.status}`)
       }
-      // AWS API Gatewayを使用する場合
-      else {
-        const token = await this.getAuthToken()
 
-        const response = await fetch(`${this.apiEndpoint}/workstates`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: token,
-          },
-          body: JSON.stringify(saveData),
-        })
-
-        if (!response.ok) {
-          throw new Error(`保存に失敗しました: ${response.status}`)
-        }
-
-        const result = await response.json()
-        return result
-      }
+      const result = await response.json()
+      console.log('Save successful:', result)
+      return result
     } catch (error) {
       console.error('Save work state error:', error)
       throw error
@@ -123,44 +82,27 @@ class MeasurementAPI {
 
   async loadWorkStates() {
     try {
-      // ローカルAPIを使用する場合
-      if (this.useLocalApi) {
-        const userId = await this.getCurrentUserId()
+      const userId = await this.getCurrentUserId()
+      const token = await this.getAuthToken()
 
-        const response = await fetch(`/api/workstates/load?userId=${encodeURIComponent(userId)}`, {
+      const response = await fetch(
+        `${this.apiEndpoint}/workstates/load?userId=${encodeURIComponent(userId)}`,
+        {
           method: 'GET',
           headers: {
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
           },
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(errorData.error || `読み込みに失敗しました: ${response.status}`)
         }
+      )
 
-        const result = await response.json()
-        console.log('Loaded work states:', result)
-        return Array.isArray(result) ? result : []
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `読み込みに失敗しました: ${response.status}`)
       }
-      // AWS API Gatewayを使用する場合
-      else {
-        const token = await this.getAuthToken()
 
-        const response = await fetch(`${this.apiEndpoint}/workstates`, {
-          method: 'GET',
-          headers: {
-            Authorization: token,
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error(`読み込みに失敗しました: ${response.status}`)
-        }
-
-        const result = await response.json()
-        return result.data || []
-      }
+      const result = await response.json()
+      console.log('Loaded work states:', result)
+      return Array.isArray(result) ? result : []
     } catch (error) {
       console.error('Load work states error:', error)
       throw error
@@ -169,47 +111,27 @@ class MeasurementAPI {
 
   async loadWorkState(workId: string) {
     try {
-      // ローカルAPIを使用する場合
-      if (this.useLocalApi) {
-        const userId = await this.getCurrentUserId()
+      const userId = await this.getCurrentUserId()
+      const token = await this.getAuthToken()
 
-        const response = await fetch(
-          `/api/workstates/load?userId=${encodeURIComponent(userId)}&workId=${encodeURIComponent(workId)}`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        )
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          throw new Error(errorData.error || `読み込みに失敗しました: ${response.status}`)
-        }
-
-        const result = await response.json()
-        console.log('Loaded work state:', result)
-        return result
-      }
-      // AWS API Gatewayを使用する場合
-      else {
-        const token = await this.getAuthToken()
-
-        const response = await fetch(`${this.apiEndpoint}/workstates/${workId}`, {
+      const response = await fetch(
+        `${this.apiEndpoint}/workstates/load?userId=${encodeURIComponent(userId)}&workId=${encodeURIComponent(workId)}`,
+        {
           method: 'GET',
           headers: {
-            Authorization: token,
+            Authorization: `Bearer ${token}`,
           },
-        })
-
-        if (!response.ok) {
-          throw new Error(`読み込みに失敗しました: ${response.status}`)
         }
+      )
 
-        const result = await response.json()
-        return result.data
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `読み込みに失敗しました: ${response.status}`)
       }
+
+      const result = await response.json()
+      console.log('Loaded work state:', result)
+      return result
     } catch (error) {
       console.error('Load work state error:', error)
       throw error
