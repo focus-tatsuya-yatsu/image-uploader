@@ -72,7 +72,6 @@ const ResponsiveHeader: React.FC<ResponsiveHeaderProps> = ({
         style={{
           background: 'linear-gradient(135deg, #DDDDDD 10%, #888888 100%)',
           color: 'white',
-          padding: '15px 20px',
           position: 'relative', // 追加
         }}
       >
@@ -80,7 +79,7 @@ const ResponsiveHeader: React.FC<ResponsiveHeaderProps> = ({
         <div
           style={{
             position: 'absolute',
-            top: '10px',
+            top: '32px',
             right: '20px',
             zIndex: 10,
             ...userBadge,
