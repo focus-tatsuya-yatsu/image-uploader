@@ -1759,9 +1759,11 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       // 背景画像を描画
       if (drawingImage) {
         const img = new Image()
+        img.crossOrigin = 'anonymous'
         img.src = drawingImage
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
           img.onload = resolve
+          img.onerror = reject
         })
         ctx.drawImage(img, 0, 0, rect.width, rect.height)
       }
