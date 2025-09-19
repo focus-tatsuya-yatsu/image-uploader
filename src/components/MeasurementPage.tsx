@@ -1722,6 +1722,13 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   const performSave = async () => {
     setIsSaving(true)
 
+    if (!drawingImage) {
+      alert('PDFに保存する図面がありません。')
+      setIsSaving(false)
+      setShowSaveDialog(false)
+      return
+    }
+
     const exportCanvas = document.createElement('canvas')
     const ctx = exportCanvas.getContext('2d')
 
@@ -1735,8 +1742,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       setHoveredBox(null)
       hideContextMenu()
       setEditingBoxId(null)
-      setShowBoxNumbers(false)
-      setShowDeleteButtons(false)
+      // setShowBoxNumbers(false)
+      // setShowDeleteButtons(false)
 
       // 高解像度設定
       const scale = 3
@@ -1967,7 +1974,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
       try {
         const saveData = {
-          workId: currentWorkId || undefined,
+          // workId: currentWorkId || undefined,
           fileName: workStateSaveFileName, // 正しい変数名
           boxes,
           measurements,
@@ -1977,7 +1984,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           version: '1.0.0',
         }
 
-        const result = await measurementAPI.saveWorkState(saveData)
+        const result = await measurementAPI.saveWorkState(saveData, currentWorkId)
 
         // 新規保存（currentWorkIdがなかった）の場合、
         // レスポンスで返ってきた新しいworkIdをstateに保存する

@@ -9,7 +9,7 @@ interface SaveWorkStateData {
   settings: any
   drawingImage?: string
   version: string
-  workId?: string // workIdをオプションプロパティとして追加
+  // workId?: string // workIdをオプションプロパティとして追加
 }
 
 class MeasurementAPI {
@@ -42,7 +42,7 @@ class MeasurementAPI {
 
   // saveWorkStateの引数はSaveWorkStateData型なので、修正は不要。
   // 呼び出し元でworkIdを渡せば、そのままbodyに含まれる。
-  async saveWorkState(saveData: SaveWorkStateData) {
+  async saveWorkState(saveData: SaveWorkStateData, workId: string | null) {
     try {
       const userId = await this.getCurrentUserId()
       const token = await this.getAuthToken()
@@ -50,6 +50,15 @@ class MeasurementAPI {
       // /workstates に POSTする（/workstates/saveではない）
       const url = `${this.apiEndpoint}/workstates`
       console.log('Saving to:', url)
+
+      // リクエストボディを動的に構築
+      const body: any = {
+        userId,
+        ...saveData,
+      }
+      if (workId) {
+        body.workId = workId
+      }
 
       const response = await fetch(url, {
         method: 'POST',
