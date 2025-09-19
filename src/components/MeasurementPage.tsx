@@ -1759,17 +1759,46 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       // 背景画像を描画
       if (drawingImage) {
         const img = new Image()
-        img.crossOrigin = 'anonymous'
 
-        // drawingImageがS3のURLかどうかを判定し、URLならタイムスタンプを付けてキャッシュを回避
-        const imageUrl = drawingImage.startsWith('http')
-          ? `${drawingImage}?v=${Date.now()}`
-          : drawingImage
+        // S3のURLかどうかを判定し、適切に処理
+        const imageUrl = (() => {
+          if (!drawingImage.startsWith('http')) {
+            return drawingImage // Data URLの場合
+          }
 
-        img.src = imageUrl // 修正したURLを使用
+          // S3のURLまたは署名付きURLの場合はそのまま使用
+          if (drawingImage.includes('amazonaws.com') || drawingImage.includes('X-Amz-Signature')) {
+            return drawingImage
+          }
+
+          // その他のHTTP URLの場合はタイムスタンプを追加
+          const separator = drawingImage.includes('?') ? '&' : '?'
+          return `${drawingImage}${separator}v=${Date.now()}`
+        })()
+        // S3のURLの場合はCORS設定を調整
+        if (imageUrl.includes('amazonaws.com') || imageUrl.includes('cloudfront.net')) {
+          // S3/CloudFront経由の場合、CORS設定が適切であればanonymousで動作
+          img.crossOrigin = 'anonymous'
+        } else if (imageUrl.startsWith('data:')) {
+          // Data URLの場合はCORS設定不要
+          // crossOriginを設定しない
+        } else {
+          // その他の外部URLの場合
+          img.crossOrigin = 'anonymous'
+        }
+
+        img.src = imageUrl
         await new Promise((resolve, reject) => {
           img.onload = resolve
-          img.onerror = reject
+          img.onerror = (error) => {
+            console.error('画像読み込みエラー:', {
+              url: imageUrl,
+              error: error,
+              isS3: imageUrl.includes('amazonaws.com'),
+              isCloudFront: imageUrl.includes('cloudfront.net'),
+            })
+            reject(new Error('画像の読み込みに失敗しました'))
+          }
         })
         ctx.drawImage(img, 0, 0, rect.width, rect.height)
       }
