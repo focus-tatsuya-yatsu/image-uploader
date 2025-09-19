@@ -9,6 +9,7 @@ interface SaveWorkStateData {
   settings: any
   drawingImage?: string
   version: string
+  workId?: string // workIdをオプションプロパティとして追加
 }
 
 class MeasurementAPI {
@@ -39,6 +40,8 @@ class MeasurementAPI {
     }
   }
 
+  // saveWorkStateの引数はSaveWorkStateData型なので、修正は不要。
+  // 呼び出し元でworkIdを渡せば、そのままbodyに含まれる。
   async saveWorkState(saveData: SaveWorkStateData) {
     try {
       const userId = await this.getCurrentUserId()
@@ -56,7 +59,7 @@ class MeasurementAPI {
         },
         body: JSON.stringify({
           userId,
-          ...saveData,
+          ...saveData, // workIdがあればここで展開される
         }),
       })
 

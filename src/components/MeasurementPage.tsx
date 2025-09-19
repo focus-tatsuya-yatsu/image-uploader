@@ -549,6 +549,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   const [showWorkStateSaveDialog, setShowWorkStateSaveDialog] = useState(false)
   const [workStateSaveFileName, setWorkStateSaveFileName] = useState('')
   const [isWorkStateSaving, setIsWorkStateSaving] = useState(false)
+  const [currentWorkId, setCurrentWorkId] = useState<string | null>(null)
   const [history, setHistory] = useState<HistoryState>({
     // 履歴管理用のState
     entries: [],
@@ -1272,6 +1273,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
         setDrawingImage(dataUrl)
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
 
+        setCurrentWorkId(null) // ★ workIdをクリア
+
         console.log(`TIFF画像を変換しました: ${firstPage.width}x${firstPage.height}`)
       } catch (error) {
         console.error('TIFF処理エラー:', error)
@@ -1645,6 +1648,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     if (confirm('すべてのボックスを削除しますか？')) {
       const previousBoxes = [...boxes] // 削除前の状態を保存
       setBoxes([])
+      setCurrentWorkId(null) // ★ workIdもクリア
       // 履歴に記録
       recordHistory(`すべてのボックスをクリア（${previousBoxes.length}個）`, [])
     }
@@ -1963,6 +1967,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
       try {
         const saveData = {
+          workId: currentWorkId || undefined,
           fileName: workStateSaveFileName, // 正しい変数名
           boxes,
           measurements,
@@ -1973,6 +1978,12 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
         }
 
         const result = await measurementAPI.saveWorkState(saveData)
+
+        // 新規保存（currentWorkIdがなかった）の場合、
+        // レスポンスで返ってきた新しいworkIdをstateに保存する
+        if (!currentWorkId) {
+          setCurrentWorkId(result.workId)
+        }
 
         alert('クラウドに保存しました')
         setShowWorkStateSaveDialog(false) // 正しい関数名
@@ -2056,6 +2067,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     }
   }, [
     workStateSaveFileName,
+    currentWorkId, // 依存配列にcurrentWorkIdを追加
     boxes,
     measurements,
     viewTransform,
@@ -2109,7 +2121,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       if (data.measurements && data.measurements.length > 0) {
         setPdfLoaded(true)
       }
-
+      setCurrentWorkId(data.workId)
       alert(`✅ クラウドから読み込みました！\nファイル名: ${data.fileName}`)
       setShowWorkStatesList(false)
     } catch (error) {
