@@ -1759,8 +1759,12 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       // 背景画像を描画
       if (drawingImage) {
         const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.src = drawingImage
+        // drawingImageがS3のURLかどうかを判定し、URLならタイムスタンプを付けてキャッシュを回避
+        const imageUrl = drawingImage.startsWith('http')
+          ? `${drawingImage}?v=${Date.now()}`
+          : drawingImage
+
+        img.src = imageUrl // 修正したURLを使用
         await new Promise((resolve, reject) => {
           img.onload = resolve
           img.onerror = reject
@@ -3184,7 +3188,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
             </button>
 
             {/* 自動保存インジケーター（オプション） */}
-            {lastAutoSave && (
+            {/* {lastAutoSave && (
               <div
                 style={{
                   fontSize: '11px',
@@ -3200,7 +3204,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                 <span>🔄</span>
                 <span>自動保存: {lastAutoSave.toLocaleTimeString('ja-JP')}</span>
               </div>
-            )}
+            )} */}
 
             <div style={styles.statusItem}>
               <span>最終保存:</span>
