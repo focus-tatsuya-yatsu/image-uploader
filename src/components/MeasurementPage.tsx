@@ -1759,6 +1759,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       // 背景画像を描画
       if (drawingImage) {
         const img = new Image()
+        img.crossOrigin = 'anonymous'
+
         // drawingImageがS3のURLかどうかを判定し、URLならタイムスタンプを付けてキャッシュを回避
         const imageUrl = drawingImage.startsWith('http')
           ? `${drawingImage}?v=${Date.now()}`
