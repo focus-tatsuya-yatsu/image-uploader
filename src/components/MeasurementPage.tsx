@@ -550,6 +550,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   const [workStateSaveFileName, setWorkStateSaveFileName] = useState('')
   const [isWorkStateSaving, setIsWorkStateSaving] = useState(false)
   const [currentWorkId, setCurrentWorkId] = useState<string | null>(null)
+  const [drawingImageS3Key, setDrawingImageS3Key] = useState<string | null>(null)
   const [history, setHistory] = useState<HistoryState>({
     // 履歴管理用のState
     entries: [],
@@ -1268,6 +1269,9 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
         // CanvasをData URLに変換
         const dataUrl = canvas.toDataURL('image/png')
+        setDrawingImage(dataUrl)
+        setDrawingImageS3Key(null) // ★ S3キーをリセット
+        setViewTransform({ scale: 1, translateX: 0, translateY: 0 })
 
         // 画像として設定
         setDrawingImage(dataUrl)
@@ -1648,7 +1652,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     if (confirm('すべてのボックスを削除しますか？')) {
       const previousBoxes = [...boxes] // 削除前の状態を保存
       setBoxes([])
-      setCurrentWorkId(null) // ★ workIdもクリア
+      setCurrentWorkId(null) // workIdもクリア
+      setDrawingImageS3Key(null) // S3キーをリセット
       // 履歴に記録
       recordHistory(`すべてのボックスをクリア（${previousBoxes.length}個）`, [])
     }
@@ -1760,47 +1765,36 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       if (drawingImage) {
         const img = new Image()
 
-        // S3のURLかどうかを判定し、適切に処理
-        const imageUrl = (() => {
-          if (!drawingImage.startsWith('http')) {
-            return drawingImage // Data URLの場合
-          }
+        try {
+          let finalImageUrl = drawingImage
 
-          // S3のURLまたは署名付きURLの場合はそのまま使用
-          if (drawingImage.includes('amazonaws.com') || drawingImage.includes('X-Amz-Signature')) {
-            return drawingImage
+          // S3キーの有無で判断し、キーを渡す
+          if (drawingImageS3Key) {
+            console.log('S3画像検出、Lambda経由で取得中...')
+            // S3キーを渡してBase64画像を取得
+            finalImageUrl = await measurementAPI.getImageAsBase64(drawingImageS3Key)
+            console.log('Lambda経由で画像取得成功')
           }
+          // 画像を描画
+          img.src = finalImageUrl
+          await new Promise((resolve, reject) => {
+            img.onload = resolve
+            img.onerror = reject
+          })
 
-          // その他のHTTP URLの場合はタイムスタンプを追加
-          const separator = drawingImage.includes('?') ? '&' : '?'
-          return `${drawingImage}${separator}v=${Date.now()}`
-        })()
-        // S3のURLの場合はCORS設定を調整
-        if (imageUrl.includes('amazonaws.com') || imageUrl.includes('cloudfront.net')) {
-          // S3/CloudFront経由の場合、CORS設定が適切であればanonymousで動作
-          img.crossOrigin = 'anonymous'
-        } else if (imageUrl.startsWith('data:')) {
-          // Data URLの場合はCORS設定不要
-          // crossOriginを設定しない
-        } else {
-          // その他の外部URLの場合
-          img.crossOrigin = 'anonymous'
+          ctx.drawImage(img, 0, 0, rect.width, rect.height)
+        } catch (error) {
+          console.error('画像処理エラー:', error)
+
+          // エラー時は処理を中断し、ユーザーに通知
+          alert(
+            '画像の読み込みに失敗しました。\nPDF保存を中断します。\n\nエラー内容：' +
+              (error as Error).message
+          )
+
+          // finally節で状態リセット処理が行われるため、ここでthrowして処理を中断
+          throw new Error('画像読み込みエラーにより処理を中断')
         }
-
-        img.src = imageUrl
-        await new Promise((resolve, reject) => {
-          img.onload = resolve
-          img.onerror = (error) => {
-            console.error('画像読み込みエラー:', {
-              url: imageUrl,
-              error: error,
-              isS3: imageUrl.includes('amazonaws.com'),
-              isCloudFront: imageUrl.includes('cloudfront.net'),
-            })
-            reject(new Error('画像の読み込みに失敗しました'))
-          }
-        })
-        ctx.drawImage(img, 0, 0, rect.width, rect.height)
       }
 
       // ボックスとテキストを手動で描画
@@ -2149,6 +2143,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
       // 状態を復元
       setDrawingImage(data.drawingImage)
+      setDrawingImageS3Key(data.s3Key) // S3キーもstateに保存
       setBoxes(data.boxes || [])
       setMeasurements(data.measurements || [])
       setViewTransform(data.viewTransform || { scale: 1, translateX: 0, translateY: 0 })

@@ -144,6 +144,39 @@ class MeasurementAPI {
       throw error
     }
   }
+
+  async getImageAsBase64(s3Key: string): Promise<string> {
+    try {
+      const token = await this.getAuthToken()
+      const url = `${this.apiEndpoint}/getimage`
+
+      console.log('Getting image from S3 with key:', s3Key)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
+        // imageUrlではなくs3Keyをbodyで送る
+        body: JSON.stringify({ s3Key }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`画像取得失敗: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (!data.success || !data.image) {
+        throw new Error('画像データが取得できませんでした')
+      }
+
+      return data.image
+    } catch (error) {
+      console.error('画像取得エラー:', error)
+      throw error
+    }
+  }
 }
 
 export const measurementAPI = new MeasurementAPI()
