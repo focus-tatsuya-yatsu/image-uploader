@@ -145,6 +145,40 @@ class MeasurementAPI {
     }
   }
 
+  // 単一または複数のワーク状態を削除
+  async deleteWorkStates(workIds: string[]) {
+    try {
+      const token = await this.getAuthToken()
+
+      // 複数削除用のエンドポイント
+      const url = `${this.apiEndpoint}/workstates/delete`
+      console.log('Deleting workstates:', workIds)
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
+        body: JSON.stringify({
+          workIds: workIds, // 配列で送る
+        }),
+      })
+
+      const responseText = await response.text()
+      console.log('Delete response:', responseText)
+
+      if (!response.ok) {
+        throw new Error(`削除失敗: ${response.status} - ${responseText}`)
+      }
+
+      return JSON.parse(responseText)
+    } catch (error) {
+      console.error('Delete error:', error)
+      throw error
+    }
+  }
+
   async getImageAsBase64(s3Key: string): Promise<string> {
     try {
       const token = await this.getAuthToken()

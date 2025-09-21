@@ -551,6 +551,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   const [isWorkStateSaving, setIsWorkStateSaving] = useState(false)
   const [currentWorkId, setCurrentWorkId] = useState<string | null>(null)
   const [drawingImageS3Key, setDrawingImageS3Key] = useState<string | null>(null)
+  const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set())
+  const [isDeleting, setIsDeleting] = useState(false)
   const [history, setHistory] = useState<HistoryState>({
     // 履歴管理用のState
     entries: [],
@@ -2316,6 +2318,61 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       const targetState = history.entries[index].snapshot
       restoreState(targetState)
       setHistory((prev) => ({ ...prev, currentIndex: index }))
+    }
+  }
+
+  // チェックボックスの選択ハンドラー
+  const handleSelectWork = (workId: string) => {
+    setSelectedWorkIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(workId)) {
+        newSet.delete(workId)
+      } else {
+        newSet.add(workId)
+      }
+      return newSet
+    })
+  }
+
+  // 全選択/全解除ハンドラー
+  const handleSelectAll = () => {
+    if (selectedWorkIds.size === savedWorkStates.length) {
+      setSelectedWorkIds(new Set())
+    } else {
+      setSelectedWorkIds(new Set(savedWorkStates.map((state: any) => state.workId)))
+    }
+  }
+
+  // 一括削除処理
+  const deleteSelectedWorks = async () => {
+    if (selectedWorkIds.size === 0) {
+      alert('削除するファイルを選択してください')
+      return
+    }
+
+    if (!confirm(`選択した${selectedWorkIds.size}件のファイルを削除しますか？`)) {
+      return
+    }
+
+    setIsDeleting(true)
+
+    try {
+      // 選択されたワークIDを配列に変換
+      const workIdsToDelete = Array.from(selectedWorkIds)
+
+      // APIを呼び出して削除
+      await measurementAPI.deleteWorkStates(workIdsToDelete)
+
+      // 削除成功後、リストを更新
+      setSavedWorkStates((prev) => prev.filter((state: any) => !selectedWorkIds.has(state.workId)))
+      setSelectedWorkIds(new Set())
+
+      alert(`${workIdsToDelete.length}件のファイルを削除しました`)
+    } catch (error) {
+      console.error('削除失敗:', error)
+      alert('削除に失敗しました')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -4151,7 +4208,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
               background: 'white',
               borderRadius: '15px',
               padding: '30px',
-              width: '600px',
+              width: '700px',
               maxWidth: '90%',
               maxHeight: '80vh',
               overflowY: 'auto',
@@ -4171,6 +4228,50 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
               ☁️ クラウドに保存されたファイル
             </h2>
 
+            {savedWorkStates.length > 0 && (
+              <div
+                style={{
+                  marginBottom: '20px',
+                  display: 'flex',
+                  gap: '10px',
+                  alignItems: 'center',
+                }}
+              >
+                <label
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={
+                      selectedWorkIds.size === savedWorkStates.length && savedWorkStates.length > 0
+                    }
+                    onChange={handleSelectAll}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <span style={{ fontSize: '14px' }}>全選択</span>
+                </label>
+
+                {selectedWorkIds.size > 0 && (
+                  <button
+                    onClick={deleteSelectedWorks}
+                    disabled={isDeleting}
+                    style={{
+                      padding: '6px 16px',
+                      background: isDeleting ? '#999' : '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: isDeleting ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontFamily: '"Noto Sans JP", sans-serif',
+                    }}
+                  >
+                    {isDeleting ? '削除中...' : `選択した${selectedWorkIds.size}件を削除`}
+                  </button>
+                )}
+              </div>
+            )}
+
             {savedWorkStates.length === 0 ? (
               <div
                 style={{
@@ -4187,30 +4288,30 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                   <div
                     key={state.workId}
                     style={{
-                      border: '1px solid #e0e0e0',
+                      border: selectedWorkIds.has(state.workId)
+                        ? '2px solid #667eea'
+                        : '1px solid #e0e0e0',
                       borderRadius: '8px',
                       padding: '15px',
                       marginBottom: '10px',
-                      background: '#f9f9f9',
+                      background: selectedWorkIds.has(state.workId) ? '#f0f8ff' : '#f9f9f9',
                       transition: 'all 0.2s',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = '#f0f0f0'
-                      e.currentTarget.style.borderColor = '#667eea'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#f9f9f9'
-                      e.currentTarget.style.borderColor = '#e0e0e0'
                     }}
                   >
                     <div
                       style={{
                         display: 'flex',
-                        justifyContent: 'space-between',
                         alignItems: 'center',
+                        gap: '15px',
                       }}
                     >
+                      <input
+                        type="checkbox"
+                        checked={selectedWorkIds.has(state.workId)}
+                        onChange={() => handleSelectWork(state.workId)}
+                        style={{ width: '16px', height: '16px' }}
+                      />
+
                       <div style={{ flex: 1 }}>
                         <div
                           style={{
@@ -4241,24 +4342,29 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                           </div>
                         )}
                       </div>
+
                       <button
                         onClick={() => loadFromCloud(state.workId)}
+                        disabled={isDeleting}
                         style={{
                           padding: '8px 20px',
                           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                           color: 'white',
                           border: 'none',
                           borderRadius: '8px',
-                          cursor: 'pointer',
+                          cursor: isDeleting ? 'not-allowed' : 'pointer',
                           fontWeight: '600',
                           fontSize: '14px',
                           fontFamily: '"Noto Sans JP", sans-serif',
                           transition: 'all 0.2s',
                           boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                          opacity: isDeleting ? 0.5 : 1,
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-1px)'
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                          if (!isDeleting) {
+                            e.currentTarget.style.transform = 'translateY(-1px)'
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                          }
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = 'translateY(0)'
@@ -4281,7 +4387,10 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
               }}
             >
               <button
-                onClick={() => setShowWorkStatesList(false)}
+                onClick={() => {
+                  setShowWorkStatesList(false)
+                  setSelectedWorkIds(new Set())
+                }}
                 style={{
                   padding: '10px 24px',
                   border: '2px solid #e0e0e0',
