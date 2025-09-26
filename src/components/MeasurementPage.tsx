@@ -8,6 +8,7 @@ import ResponsiveHeader from './ResponsiveHeader'
 import ResponsiveHistoryPanel from './ResponsiveHistoryPanel'
 import styles from '../app/responsive.module.css'
 import { measurementAPI } from '@/lib/api-client'
+import ApprovalStamp from './ApprovalStamp'
 
 // 型定義
 interface Box {
@@ -89,6 +90,27 @@ interface MeasurementPageProps {
   user?: any
   logout?: () => void
   isMobile?: boolean
+}
+
+// ApprovalStampData型を追加
+interface ApprovalStampData {
+  id: number
+  x: number
+  y: number
+  width: number
+  height: number
+  type: 'approvalStamp'
+  data: {
+    title: string
+    date: string
+    orderNo: string
+    companyName: string
+    stamps: {
+      approval: string | null
+      confirmation: string | null
+      creation: string | null
+    }
+  }
 }
 
 // SaveDialogコンポーネント
@@ -563,6 +585,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   const [isSavingToCloud, setIsSavingToCloud] = useState(false)
   const [savedWorkStates, setSavedWorkStates] = useState<any[]>([])
   const [showWorkStatesList, setShowWorkStatesList] = useState(false)
+  const [approvalStamps, setApprovalStamps] = useState<ApprovalStampData[]>([])
+  const [stampMode, setStampMode] = useState(false)
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1855,6 +1879,63 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
         }
       })
 
+      // 承認印の描画
+      approvalStamps.forEach((stamp) => {
+        // 外枠の描画
+        ctx.strokeStyle = '#ff0000'
+        ctx.lineWidth = 2
+        ctx.strokeRect(stamp.x, stamp.y, stamp.width, stamp.height)
+
+        // 背景白
+        ctx.fillStyle = 'white'
+        ctx.fillRect(stamp.x, stamp.y, stamp.width, stamp.height)
+
+        // タイトル
+        ctx.fillStyle = '#ff0000'
+        ctx.font = 'bold 20px "游明朝", serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('検査成績表', stamp.x + stamp.width / 2, stamp.y + 30)
+
+        // 日付
+        ctx.font = '14px "游明朝", serif'
+        ctx.textAlign = 'left'
+        ctx.fillStyle = 'black'
+        ctx.fillText(stamp.data.date, stamp.x + 10, stamp.y + 60)
+
+        // 承認印の描画
+        const positions = {
+          approval: { x: stamp.x + 70, y: stamp.y + 120, label: '承認' },
+          confirmation: { x: stamp.x + 200, y: stamp.y + 120, label: '確認' },
+          creation: { x: stamp.x + 330, y: stamp.y + 120, label: '作成' },
+        }
+
+        Object.entries(positions).forEach(([key, pos]) => {
+          // ラベル
+          ctx.fillStyle = 'black'
+          ctx.font = '14px "游明朝", serif'
+          ctx.textAlign = 'center'
+          ctx.fillText(pos.label, pos.x, pos.y - 10)
+
+          // 印鑑
+          const name = stamp.data.stamps[key as keyof typeof stamp.data.stamps]
+          if (name) {
+            // 赤い円
+            ctx.strokeStyle = '#ff0000'
+            ctx.lineWidth = 3
+            ctx.beginPath()
+            ctx.arc(pos.x, pos.y + 30, 30, 0, Math.PI * 2)
+            ctx.stroke()
+
+            // 名前
+            ctx.fillStyle = '#ff0000'
+            ctx.font = 'bold 24px serif'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(name, pos.x, pos.y + 30)
+          }
+        })
+      })
+
       // PDFを生成
       const pdf = new jsPDF('landscape', 'mm', 'a4')
       const imgData = exportCanvas.toDataURL('image/png')
@@ -2374,6 +2455,30 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     } finally {
       setIsDeleting(false)
     }
+  }
+
+  // ============ 承認印の追加関数 ============
+  const addApprovalStamp = () => {
+    const newStamp: ApprovalStampData = {
+      id: Date.now(),
+      x: 100,
+      y: 100,
+      width: 400,
+      height: 330,
+      type: 'approvalStamp',
+      data: {
+        title: '検査成績表',
+        date: new Date().toLocaleDateString('ja-JP'),
+        orderNo: '',
+        companyName: '協立機興株式会社',
+        stamps: {
+          approval: null,
+          confirmation: null,
+          creation: null,
+        },
+      },
+    }
+    setApprovalStamps([...approvalStamps, newStamp])
   }
 
   // 状態復元のヘルパー関数
@@ -3344,6 +3449,14 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
             </div>
           </div>
 
+          <button style={styles.actionBtn(stampMode)} onClick={() => setStampMode(!stampMode)}>
+            🔴 承認印モード
+          </button>
+
+          <button style={styles.uploadBtn} onClick={addApprovalStamp} disabled={!drawingImage}>
+            📝 承認印を追加
+          </button>
+
           {/* 自動転記ボタンを右端に配置 */}
           <button
             style={styles.autoAssignButton}
@@ -3554,6 +3667,24 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                       </div>
                     )
                   })}
+
+                  {/* 承認印の表示 */}
+                  {approvalStamps.map((stamp) => (
+                    <ApprovalStamp
+                      key={stamp.id}
+                      stamp={stamp}
+                      onUpdate={(updatedStamp) => {
+                        setApprovalStamps((prev) =>
+                          prev.map((s) => (s.id === updatedStamp.id ? updatedStamp : s))
+                        )
+                      }}
+                      onDelete={(id) => {
+                        setApprovalStamps((prev) => prev.filter((s) => s.id !== id))
+                      }}
+                      isDragging={draggedBoxId === stamp.id}
+                      textColorMode={textColorMode}
+                    />
+                  ))}
 
                   {/* 描画中のボックス */}
                   {currentBox && (
