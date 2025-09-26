@@ -1390,6 +1390,24 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     }
   }
 
+  const handleStampMouseDown = (e: React.MouseEvent, stampId: number) => {
+    e.stopPropagation()
+
+    if (!drawMode && e.button === 0 && !e.ctrlKey) {
+      const stamp = approvalStamps.find((s) => s.id === stampId)
+      if (!stamp) return
+
+      const canvasPos = screenToCanvas(e.clientX, e.clientY)
+
+      setIsDraggingBox(true)
+      setDraggedBoxId(stampId)
+      setDragOffset({
+        x: canvasPos.x - stamp.x,
+        y: canvasPos.y - stamp.y,
+      })
+    }
+  }
+
   // マウス移動処理
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!e || typeof e.preventDefault !== 'function') {
@@ -1414,6 +1432,21 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           return box
         })
       )
+
+      // 承認印の移動処理を追加！
+      setApprovalStamps((prev) =>
+        prev.map((stamp) => {
+          if (stamp.id === draggedBoxId) {
+            return {
+              ...stamp,
+              x: canvasPos.x - dragOffset.x,
+              y: canvasPos.y - dragOffset.y,
+            }
+          }
+          return stamp
+        })
+      )
+
       return
     }
 
@@ -1494,6 +1527,83 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           return box
         })
       )
+
+      // 承認印のリサイズ処理を追加！
+      setApprovalStamps((prev) =>
+        prev.map((stamp) => {
+          if (stamp.id === resizingBoxId) {
+            let newX = resizeStartBox.x
+            let newY = resizeStartBox.y
+            let newWidth = resizeStartBox.width
+            let newHeight = resizeStartBox.height
+
+            // ハンドル位置に応じてリサイズ処理（ボックスと同じロジック）
+            switch (resizeHandle) {
+              case 'nw':
+                newX = resizeStartBox.x + dx
+                newY = resizeStartBox.y + dy
+                newWidth = resizeStartBox.width - dx
+                newHeight = resizeStartBox.height - dy
+                break
+              case 'ne':
+                newY = resizeStartBox.y + dy
+                newWidth = resizeStartBox.width + dx
+                newHeight = resizeStartBox.height - dy
+                break
+              case 'se':
+                newWidth = resizeStartBox.width + dx
+                newHeight = resizeStartBox.height + dy
+                break
+              case 'sw':
+                newX = resizeStartBox.x + dx
+                newWidth = resizeStartBox.width - dx
+                newHeight = resizeStartBox.height + dy
+                break
+              case 'n':
+                newY = resizeStartBox.y + dy
+                newHeight = resizeStartBox.height - dy
+                break
+              case 'e':
+                newWidth = resizeStartBox.width + dx
+                break
+              case 's':
+                newHeight = resizeStartBox.height + dy
+                break
+              case 'w':
+                newX = resizeStartBox.x + dx
+                newWidth = resizeStartBox.width - dx
+                break
+            }
+
+            // 承認印用の最小サイズ制限（ボックスより大きめ）
+            const minStampWidth = 200 // 承認印の最小幅
+            const minStampHeight = 150 // 承認印の最小高さ
+
+            if (newWidth < minStampWidth) {
+              newWidth = minStampWidth
+              if (resizeHandle.includes('w')) {
+                newX = resizeStartBox.x + resizeStartBox.width - minStampWidth
+              }
+            }
+            if (newHeight < minStampHeight) {
+              newHeight = minStampHeight
+              if (resizeHandle.includes('n')) {
+                newY = resizeStartBox.y + resizeStartBox.height - minStampHeight
+              }
+            }
+
+            return {
+              ...stamp,
+              x: newX,
+              y: newY,
+              width: newWidth,
+              height: newHeight,
+            }
+          }
+          return stamp
+        })
+      )
+
       return
     }
 
@@ -1746,6 +1856,36 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     setResizingBoxId(boxId)
     setResizeHandle(handle)
     setResizeStartBox({ ...box })
+    setResizeStartPos(canvasPos)
+  }
+
+  // 既存のhandleResizeStartの下に追加
+  const handleStampResizeStart = (
+    e: React.MouseEvent,
+    stampId: number,
+    handle: ResizeHandle['position']
+  ) => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const stamp = approvalStamps.find((s) => s.id === stampId)
+    if (!stamp) return
+
+    const canvasPos = screenToCanvas(e.clientX, e.clientY)
+
+    setIsResizing(true)
+    setResizingBoxId(stampId)
+    setResizeHandle(handle)
+    setResizeStartBox({
+      id: stamp.id,
+      x: stamp.x,
+      y: stamp.y,
+      width: stamp.width,
+      height: stamp.height,
+      value: null,
+      index: -1,
+      decimalPlaces: 0,
+    })
     setResizeStartPos(canvasPos)
   }
 
@@ -2459,6 +2599,11 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
   // ============ 承認印の追加関数 ============
   const addApprovalStamp = () => {
+    // 移動・編集モードでない場合は追加しない
+    if (drawMode) {
+      alert('移動・編集モードに切り替えてから承認印を追加してください')
+      return
+    }
     const newStamp: ApprovalStampData = {
       id: Date.now(),
       x: 100,
@@ -3453,7 +3598,11 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
             🔴 承認印モード
           </button>
 
-          <button style={styles.uploadBtn} onClick={addApprovalStamp} disabled={!drawingImage}>
+          <button
+            style={styles.uploadBtn}
+            onClick={addApprovalStamp}
+            disabled={!drawingImage || drawMode}
+          >
             📝 承認印を追加
           </button>
 
@@ -3669,21 +3818,96 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                   })}
 
                   {/* 承認印の表示 */}
+                  {/* 承認印の表示 */}
                   {approvalStamps.map((stamp) => (
-                    <ApprovalStamp
+                    <div
                       key={stamp.id}
-                      stamp={stamp}
-                      onUpdate={(updatedStamp) => {
-                        setApprovalStamps((prev) =>
-                          prev.map((s) => (s.id === updatedStamp.id ? updatedStamp : s))
-                        )
+                      style={{
+                        position: 'absolute',
+                        left: `${stamp.x}px`,
+                        top: `${stamp.y}px`,
+                        width: `${stamp.width}px`,
+                        height: `${stamp.height}px`,
+                        cursor:
+                          !drawMode && draggedBoxId === stamp.id
+                            ? 'grabbing'
+                            : !drawMode
+                              ? 'grab'
+                              : 'default',
                       }}
-                      onDelete={(id) => {
-                        setApprovalStamps((prev) => prev.filter((s) => s.id !== id))
-                      }}
-                      isDragging={draggedBoxId === stamp.id}
-                      textColorMode={textColorMode}
-                    />
+                      onMouseDown={(e) => handleStampMouseDown(e, stamp.id)}
+                    >
+                      <ApprovalStamp
+                        stamp={{
+                          ...stamp,
+                          x: 0,
+                          y: 0,
+                        }}
+                        onUpdate={(updatedStamp) => {
+                          setApprovalStamps((prev) =>
+                            prev.map((s) =>
+                              s.id === updatedStamp.id
+                                ? {
+                                    ...updatedStamp,
+                                    x: stamp.x,
+                                    y: stamp.y,
+                                  }
+                                : s
+                            )
+                          )
+                        }}
+                        onDelete={(id) => {
+                          setApprovalStamps((prev) => prev.filter((s) => s.id !== id))
+                        }}
+                        isDragging={draggedBoxId === stamp.id}
+                        textColorMode={textColorMode}
+                      />
+
+                      {/* リサイズハンドルを追加 */}
+                      {!drawMode && !editingBoxId && !isDraggingBox && !isPanning && (
+                        <>
+                          {RESIZE_HANDLES.map((handle) => {
+                            const handleSize = getScaledElementSize(8, viewTransform.scale)
+                            const pos = getHandlePosition(
+                              {
+                                id: stamp.id,
+                                x: 0,
+                                y: 0,
+                                width: stamp.width,
+                                height: stamp.height,
+                                value: null,
+                                index: -1,
+                                decimalPlaces: 0,
+                              },
+                              handle.position,
+                              handleSize
+                            )
+
+                            return (
+                              <div
+                                key={handle.position}
+                                style={{
+                                  ...resizeHandleStyle(handle.position, handleSize, textColorMode),
+                                  left: `${pos.x}px`,
+                                  top: `${pos.y}px`,
+                                }}
+                                onMouseDown={(e) =>
+                                  handleStampResizeStart(e, stamp.id, handle.position)
+                                }
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.opacity = '1'
+                                  e.currentTarget.style.transform = 'scale(1.2)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.opacity = '0.8'
+                                  e.currentTarget.style.transform = 'scale(1)'
+                                }}
+                              />
+                            )
+                          })}
+                        </>
+                      )}
+                    </div>
                   ))}
 
                   {/* 描画中のボックス */}
