@@ -549,7 +549,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   const [defaultDecimalPlaces, setDefaultDecimalPlaces] = useState(2)
   const [editingBoxId, setEditingBoxId] = useState<number | null>(null)
   const [editingValue, setEditingValue] = useState('')
-  const [minBoxSize, setMinBoxSize] = useState(3)
+  const [minBoxSize, setMinBoxSize] = useState(1)
   const [minFontSize, setMinFontSize] = useState(2)
   const [showBoxNumbers, setShowBoxNumbers] = useState(true)
   const [showDeleteButtons, setShowDeleteButtons] = useState(true)
@@ -586,7 +586,6 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
   const [savedWorkStates, setSavedWorkStates] = useState<any[]>([])
   const [showWorkStatesList, setShowWorkStatesList] = useState(false)
   const [approvalStamps, setApprovalStamps] = useState<ApprovalStampData[]>([])
-  const [stampMode, setStampMode] = useState(false)
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -2020,62 +2019,231 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       })
 
       // 承認印の描画
+      // 承認印の描画（最終修正版）
+      // 承認印の描画（完全修正版）
       approvalStamps.forEach((stamp) => {
-        // 外枠の描画
+        // 座標とサイズの計算（viewTransform適用）
+        const stampX = stamp.x
+        const stampY = stamp.y
+        const stampWidth = stamp.width
+        const stampHeight = stamp.height
+
+        // ApprovalStamp.tsxと同じスケール計算
+        const baseWidth = 400
+        const baseHeight = 330
+        const stampScale = Math.min(stampWidth / baseWidth, stampHeight / baseHeight, 1)
+
+        // 白背景
+        ctx.fillStyle = 'white'
+        ctx.fillRect(stampX, stampY, stampWidth, stampHeight)
+
+        // 外枠（3px）
+        ctx.strokeStyle = '#ff0000'
+        ctx.lineWidth = 3
+        ctx.strokeRect(stampX, stampY, stampWidth, stampHeight)
+
+        // 1. タイトルと日付セクション
+        const headerHeight = Math.max(40, 80 * stampScale)
+
+        // 横線（タイトル下）
+        ctx.strokeStyle = '#ff0000'
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.moveTo(stampX, stampY + headerHeight)
+        ctx.lineTo(stampX + stampWidth, stampY + headerHeight)
+        ctx.stroke()
+
+        // タイトル（letterSpacing適用）
+        ctx.save()
+        ctx.fillStyle = '#ff0000'
+        const titleFontSize = Math.max(12, 24 * stampScale)
+        ctx.font = `bold ${titleFontSize}px "游明朝", "Yu Mincho", serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+
+        // レタースペーシングを手動で実装
+        const title = stamp.data.title || '検査成績表'
+        if (stampScale > 0.3) {
+          const letterSpacing = 0.3 * stampScale * titleFontSize
+          const titleChars = title.split('')
+          const totalWidth =
+            titleChars.length * titleFontSize + (titleChars.length - 1) * letterSpacing
+          let currentX = stampX + (stampWidth - totalWidth) / 2 + titleFontSize / 2
+
+          titleChars.forEach((char, index) => {
+            ctx.fillText(char, currentX, stampY + 10 * stampScale)
+            currentX += titleFontSize + letterSpacing
+          })
+        } else {
+          ctx.fillText(title, stampX + stampWidth / 2, stampY + 10 * stampScale)
+        }
+        ctx.restore()
+
+        // 日付（右寄せ）
+        const dateFontSize = Math.max(7, 14 * stampScale)
+        ctx.font = `${dateFontSize}px "游明朝", "Yu Mincho", serif`
+        ctx.textAlign = 'right'
+        ctx.fillStyle = '#ff0000'
+        const dateY = stampY + headerHeight - 20 * stampScale
+        ctx.fillText(stamp.data.date || '2025/9/26', stampX + stampWidth - 15 * stampScale, dateY)
+
+        // 2. 会社名セクション
+        const companyHeight = Math.max(25, 50 * stampScale)
+        const companyY = stampY + headerHeight
+
+        // 横線（会社名下）
+        ctx.strokeStyle = '#ff0000'
+        ctx.lineWidth = 3
+        ctx.beginPath()
+        ctx.moveTo(stampX, companyY + companyHeight)
+        ctx.lineTo(stampX + stampWidth, companyY + companyHeight)
+        ctx.stroke()
+
+        // 会社名（letterSpacing適用）
+        ctx.save()
+        const companyFontSize = Math.max(7, 18 * stampScale)
+        ctx.font = `bold ${companyFontSize}px "游明朝", "Yu Mincho", serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#ff0000'
+
+        const companyName = stamp.data.companyName || '協立機興株式会社'
+        const companyLetterSpacing = 0.5 * stampScale * companyFontSize
+        const companyChars = companyName.split('')
+        const companyTotalWidth =
+          companyChars.length * companyFontSize + (companyChars.length - 1) * companyLetterSpacing
+        let companyCurrentX = stampX + (stampWidth - companyTotalWidth) / 2 + companyFontSize / 2
+
+        companyChars.forEach((char) => {
+          ctx.fillText(char, companyCurrentX, companyY + companyHeight / 2)
+          companyCurrentX += companyFontSize + companyLetterSpacing
+        })
+        ctx.restore()
+
+        // 3. 承認欄セクション
+        const stampsY = companyY + companyHeight
+        const stampsHeight =
+          stampHeight -
+          headerHeight -
+          companyHeight -
+          (stampScale > 0.25 ? Math.max(20, 50 * stampScale) : 0)
+        const columnWidth = stampWidth / 3
+
+        // 縦線
         ctx.strokeStyle = '#ff0000'
         ctx.lineWidth = 2
-        ctx.strokeRect(stamp.x, stamp.y, stamp.width, stamp.height)
-
-        // 背景白
-        ctx.fillStyle = 'white'
-        ctx.fillRect(stamp.x, stamp.y, stamp.width, stamp.height)
-
-        // タイトル
-        ctx.fillStyle = '#ff0000'
-        ctx.font = 'bold 20px "游明朝", serif'
-        ctx.textAlign = 'center'
-        ctx.fillText('検査成績表', stamp.x + stamp.width / 2, stamp.y + 30)
-
-        // 日付
-        ctx.font = '14px "游明朝", serif'
-        ctx.textAlign = 'left'
-        ctx.fillStyle = 'black'
-        ctx.fillText(stamp.data.date, stamp.x + 10, stamp.y + 60)
-
-        // 承認印の描画
-        const positions = {
-          approval: { x: stamp.x + 70, y: stamp.y + 120, label: '承認' },
-          confirmation: { x: stamp.x + 200, y: stamp.y + 120, label: '確認' },
-          creation: { x: stamp.x + 330, y: stamp.y + 120, label: '作成' },
+        for (let i = 1; i < 3; i++) {
+          ctx.beginPath()
+          ctx.moveTo(stampX + columnWidth * i, stampsY)
+          ctx.lineTo(stampX + columnWidth * i, stampsY + stampsHeight)
+          ctx.stroke()
         }
 
-        Object.entries(positions).forEach(([key, pos]) => {
-          // ラベル
-          ctx.fillStyle = 'black'
-          ctx.font = '14px "游明朝", serif'
-          ctx.textAlign = 'center'
-          ctx.fillText(pos.label, pos.x, pos.y - 10)
+        // ヘッダー横線
+        const stampHeaderHeight = Math.max(20, 40 * stampScale)
+        ctx.strokeStyle = '#ff0000'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(stampX, stampsY + stampHeaderHeight)
+        ctx.lineTo(stampX + stampWidth, stampsY + stampHeaderHeight)
+        ctx.stroke()
 
-          // 印鑑
-          const name = stamp.data.stamps[key as keyof typeof stamp.data.stamps]
+        // 承認・確認・作成
+        const stampTypes = [
+          { key: 'approval', label: '承認' },
+          { key: 'confirmation', label: '確認' },
+          { key: 'creation', label: '作成' },
+        ]
+
+        stampTypes.forEach((type, index) => {
+          const centerX = stampX + columnWidth * index + columnWidth / 2
+
+          // ラベル
+          ctx.fillStyle = '#ff0000'
+          ctx.font = `bold ${Math.max(8, 14 * stampScale)}px "游明朝", "Yu Mincho", serif`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(type.label, centerX, stampsY + stampHeaderHeight / 2)
+
+          // 印鑑部分
+          const stampAreaY = stampsY + stampHeaderHeight
+          const stampAreaHeight = stampsHeight - stampHeaderHeight
+          const stampCenterY = stampAreaY + stampAreaHeight / 2
+
+          const name = stamp.data.stamps[type.key as keyof typeof stamp.data.stamps]
           if (name) {
-            // 赤い円
+            // 印鑑の円（大きめに調整）
+            const stampRadius = Math.min(40, Math.max(10, 40 * stampScale))
+
             ctx.strokeStyle = '#ff0000'
-            ctx.lineWidth = 3
+            ctx.lineWidth = Math.max(1, 2 * stampScale)
             ctx.beginPath()
-            ctx.arc(pos.x, pos.y + 30, 30, 0, Math.PI * 2)
+            ctx.arc(centerX, stampCenterY, stampRadius, 0, Math.PI * 2)
             ctx.stroke()
 
-            // 名前
+            // 名前（ApprovalStamp.tsxのgetFontSize関数と同じロジック）
+            const nameLength = name.length
+            let fontSize: number
+            if (nameLength <= 2) {
+              fontSize = stampRadius * 0.9
+            } else if (nameLength === 3) {
+              fontSize = stampRadius * 0.6
+            } else if (nameLength === 4) {
+              fontSize = stampRadius * 0.43
+            } else if (nameLength === 5) {
+              fontSize = stampRadius * 0.38
+            } else {
+              fontSize = stampRadius * 0.35
+            }
+
             ctx.fillStyle = '#ff0000'
-            ctx.font = 'bold 24px serif'
+            ctx.font = `bold ${Math.max(1, fontSize)}px serif`
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
-            ctx.fillText(name, pos.x, pos.y + 30)
+            ctx.fillText(name, centerX, stampCenterY)
           }
         })
-      })
 
+        // 4. 受注番号セクション（stampScale > 0.25の場合のみ）
+        if (stampScale > 0.25) {
+          const orderHeight = Math.max(20, 50 * stampScale)
+          const orderY = stampY + stampHeight - orderHeight
+
+          // 上部横線
+          ctx.strokeStyle = '#ff0000'
+          ctx.lineWidth = 3
+          ctx.beginPath()
+          ctx.moveTo(stampX, orderY)
+          ctx.lineTo(stampX + stampWidth, orderY)
+          ctx.stroke()
+
+          // 縦線の位置（ApprovalStamp.tsxと同じ計算）
+          const vertLineX = stampX + Math.max(50, 138 * stampScale)
+          ctx.strokeStyle = '#ff0000'
+          ctx.lineWidth = 2
+          ctx.beginPath()
+          ctx.moveTo(vertLineX, orderY)
+          ctx.lineTo(vertLineX, stampY + stampHeight)
+          ctx.stroke()
+
+          // テキスト
+          const orderTextY = orderY + orderHeight / 2
+          ctx.fillStyle = '#ff0000'
+          ctx.font = `bold ${Math.max(8, 16 * stampScale)}px "游明朝", "Yu Mincho", serif`
+
+          // "受注番号"ラベル
+          ctx.textAlign = 'left'
+          ctx.textBaseline = 'middle'
+          const labelText = stampScale > 0.35 ? '受注番号' : '受注'
+          ctx.fillText(labelText, stampX + Math.max(4, 8 * stampScale), orderTextY)
+
+          // 受注番号の値
+          if (stamp.data.orderNo) {
+            ctx.textAlign = 'left'
+            ctx.fillText(stamp.data.orderNo, vertLineX + Math.max(20, 40 * stampScale), orderTextY)
+          }
+        }
+      })
       // PDFを生成
       const pdf = new jsPDF('landscape', 'mm', 'a4')
       const imgData = exportCanvas.toDataURL('image/png')
@@ -2608,8 +2776,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       id: Date.now(),
       x: 100,
       y: 100,
-      width: 400,
-      height: 330,
+      width: 200,
+      height: 150,
       type: 'approvalStamp',
       data: {
         title: '検査成績表',
@@ -3467,6 +3635,22 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
               🔢 番号整理
             </button>
 
+            <button
+              style={{
+                ...styles.uploadBtn,
+                background: drawMode
+                  ? 'white'
+                  : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: drawMode ? '#999' : 'white',
+                border: drawMode ? '2px solid #e0e0e0' : 'none',
+                cursor: drawMode ? 'not-allowed' : 'pointer',
+              }}
+              onClick={addApprovalStamp}
+              disabled={!drawingImage || drawMode}
+            >
+              🔏 承認印を追加
+            </button>
+
             {/* 作業状態の保存/読み込みボタンを追加 */}
             <button
               style={{
@@ -3520,30 +3704,6 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
               ☁️ クラウドから読み込む
             </button>
 
-            {/* 自動保存インジケーター（オプション） */}
-            {/* {lastAutoSave && (
-              <div
-                style={{
-                  fontSize: '11px',
-                  color: '#666',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 8px',
-                  background: '#f0f8ff',
-                  borderRadius: '12px',
-                }}
-              >
-                <span>🔄</span>
-                <span>自動保存: {lastAutoSave.toLocaleTimeString('ja-JP')}</span>
-              </div>
-            )} */}
-
-            <div style={styles.statusItem}>
-              <span>最終保存:</span>
-              <strong>{lastAutoSave ? lastAutoSave.toLocaleTimeString('ja-JP') : '未保存'}</strong>
-            </div>
-
             <div style={styles.decimalControl}>
               <span>デフォルト桁数:</span>
               <input
@@ -3574,37 +3734,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                 一括適用
               </button>
             </div>
-
-            <div style={styles.decimalControl}>
-              <span>最小BOX:</span>
-              <input
-                type="number"
-                min="1"
-                max="20"
-                value={minBoxSize}
-                onChange={(e) => setMinBoxSize(parseInt(e.target.value) || 3)}
-                style={{
-                  width: '40px',
-                  padding: '2px 4px',
-                  borderRadius: '4px',
-                  border: '1px solid #ccc',
-                }}
-              />
-              <span>px</span>
-            </div>
           </div>
-
-          <button style={styles.actionBtn(stampMode)} onClick={() => setStampMode(!stampMode)}>
-            🔴 承認印モード
-          </button>
-
-          <button
-            style={styles.uploadBtn}
-            onClick={addApprovalStamp}
-            disabled={!drawingImage || drawMode}
-          >
-            📝 承認印を追加
-          </button>
 
           {/* 自動転記ボタンを右端に配置 */}
           <button
@@ -3861,6 +3991,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                         }}
                         isDragging={draggedBoxId === stamp.id}
                         textColorMode={textColorMode}
+                        showDeleteButtons={showDeleteButtons}
                       />
 
                       {/* リサイズハンドルを追加 */}
@@ -4093,12 +4224,12 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
               <strong>{Math.round(viewTransform.scale * 100)}%</strong>
             </div>
             <div style={styles.statusItem}>
-              <span>最小サイズ:</span>
-              <strong>{minBoxSize}px</strong>
-            </div>
-            <div style={styles.statusItem}>
               <span>最小フォント:</span>
               <strong>{minFontSize}px</strong>
+            </div>
+            <div style={styles.statusItem}>
+              <span>最終保存:</span>
+              <strong>{lastAutoSave ? lastAutoSave.toLocaleTimeString('ja-JP') : '未保存'}</strong>
             </div>
           </div>
         </div>

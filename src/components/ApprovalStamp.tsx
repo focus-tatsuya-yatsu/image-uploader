@@ -26,6 +26,7 @@ interface ApprovalStampProps {
   onDelete: (id: number) => void
   isDragging?: boolean
   textColorMode: 'black' | 'white'
+  showDeleteButtons?: boolean
 }
 
 // スケール計算関数を追加
@@ -57,7 +58,7 @@ const StampMark: React.FC<{
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          fontSize: `${Math.max(6, 10 * scale)}px`,
+          fontSize: `${Math.max(3, 10 * scale)}px`,
           color: '#999',
         }}
       >
@@ -111,6 +112,7 @@ export const ApprovalStamp: React.FC<ApprovalStampProps> = ({
   onUpdate,
   onDelete,
   isDragging,
+  showDeleteButtons = true,
 }) => {
   const [isEditingDate, setIsEditingDate] = useState(false)
   const [isEditingOrderNo, setIsEditingOrderNo] = useState(false)
@@ -170,6 +172,46 @@ export const ApprovalStamp: React.FC<ApprovalStampProps> = ({
       >
         承認印
         {/* 削除ボタン */}
+        {showDeleteButtons && ( // この条件を追加
+          <button
+            onClick={() => onDelete(stamp.id)}
+            style={{
+              position: 'absolute',
+              top: '-10px',
+              right: '-10px',
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: '#ff0000',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '16px',
+              zIndex: 10,
+            }}
+          >
+            ×
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      style={{
+        width: `${stamp.width}px`,
+        height: `${stamp.height}px`,
+        border: '3px solid #ff0000',
+        background: 'white',
+        fontFamily: '"游明朝", "Yu Mincho", serif',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        color: '#ff0000',
+      }}
+    >
+      {/* 削除ボタン */}
+      {showDeleteButtons && (
         <button
           onClick={() => onDelete(stamp.id)}
           style={{
@@ -189,44 +231,7 @@ export const ApprovalStamp: React.FC<ApprovalStampProps> = ({
         >
           ×
         </button>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      style={{
-        width: `${stamp.width}px`,
-        height: `${stamp.height}px`,
-        border: '3px solid #ff0000',
-        background: 'white',
-        fontFamily: '"游明朝", "Yu Mincho", serif',
-        cursor: isDragging ? 'grabbing' : 'grab',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        color: '#ff0000',
-      }}
-    >
-      {/* 削除ボタン */}
-      <button
-        onClick={() => onDelete(stamp.id)}
-        style={{
-          position: 'absolute',
-          top: '-10px',
-          right: '-10px',
-          width: '24px',
-          height: '24px',
-          borderRadius: '50%',
-          background: '#ff0000',
-          color: 'white',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: '16px',
-          zIndex: 10,
-        }}
-      >
-        ×
-      </button>
-
+      )}
       <div
         style={{
           display: 'flex',
@@ -415,7 +420,7 @@ export const ApprovalStamp: React.FC<ApprovalStampProps> = ({
               <div
                 style={{
                   position: 'absolute', // absoluteに変更
-                  left: `${Math.max(50, 107 * scale)}px`, // 位置を調整
+                  left: `${Math.max(50, 140 * scale)}px`, // 位置を調整
                   top: 0, // 上端から
                   bottom: 0, // 下端まで
                   width: '2px',
@@ -456,8 +461,8 @@ export const ApprovalStamp: React.FC<ApprovalStampProps> = ({
                 style={{
                   cursor: 'pointer',
                   flex: 1,
-                  letterSpacing: `${0.1 * scale}rem`,
-                  marginLeft: scale > 0.3 ? `${Math.max(20, 40 * scale)}px` : '10px', // 縦線との間隔
+                  letterSpacing: `${0.2 * scale}rem`,
+                  marginLeft: scale > 0.3 ? `${Math.max(20, 70 * scale)}px` : '10px', // 縦線との間隔
                 }}
               >
                 {stamp.data.orderNo || '_________'}
