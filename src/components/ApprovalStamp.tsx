@@ -420,7 +420,7 @@ export const ApprovalStamp: React.FC<ApprovalStampProps> = ({
               <div
                 style={{
                   position: 'absolute', // absoluteに変更
-                  left: `${Math.max(50, 140 * scale)}px`, // 位置を調整
+                  left: `${Math.max(50, 138 * scale)}px`, // 位置を調整
                   top: 0, // 上端から
                   bottom: 0, // 下端まで
                   width: '2px',

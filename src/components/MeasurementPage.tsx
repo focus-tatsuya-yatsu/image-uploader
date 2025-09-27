@@ -5,8 +5,6 @@ import jsPDF from 'jspdf'
 import UTIF from 'utif'
 import NextImage from 'next/image'
 import ResponsiveHeader from './ResponsiveHeader'
-import ResponsiveHistoryPanel from './ResponsiveHistoryPanel'
-import styles from '../app/responsive.module.css'
 import { measurementAPI } from '@/lib/api-client'
 import ApprovalStamp from './ApprovalStamp'
 
@@ -66,6 +64,7 @@ interface SaveData {
     showBoxNumbers: boolean
     showDeleteButtons: boolean
   }
+  approvalStamps?: ApprovalStampData[]
 }
 
 interface HistoryEntry {
@@ -2085,7 +2084,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
         ctx.textAlign = 'right'
         ctx.fillStyle = '#ff0000'
         const dateY = stampY + headerHeight - 20 * stampScale
-        ctx.fillText(stamp.data.date || '2025/9/26', stampX + stampWidth - 15 * stampScale, dateY)
+        ctx.fillText(stamp.data.date || '2025/10/01', stampX + stampWidth - 15 * stampScale, dateY)
 
         // 2. 会社名セクション
         const companyHeight = Math.max(25, 50 * stampScale)
@@ -2404,6 +2403,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           settings, // 上で作成したsettings
           drawingImage: drawingImage || '', // 現在の画像
           version: '1.0.0',
+          approvalStamps,
         }
 
         const result = await measurementAPI.saveWorkState(saveData, currentWorkId)
@@ -2436,6 +2436,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           measurements,
           viewTransform,
           settings,
+          approvalStamps,
         }
 
         const finalFileName =
@@ -2532,12 +2533,29 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     try {
       const data = await measurementAPI.loadWorkState(workId)
 
+      // S3画像の処理を追加
+      let finalImageUrl = data.drawingImage
+
+      // S3キーがある場合は、Base64形式に変換
+      if (data.s3Key) {
+        console.log('S3画像を取得中...')
+        try {
+          // Lambda経由でBase64画像を取得
+          finalImageUrl = await measurementAPI.getImageAsBase64(data.s3Key)
+        } catch (error) {
+          console.error('画像取得エラー:', error)
+          // エラーの場合は署名付きURLをそのまま使用
+          finalImageUrl = data.drawingImage
+        }
+      }
+
       // 状態を復元
-      setDrawingImage(data.drawingImage)
-      setDrawingImageS3Key(data.s3Key) // S3キーもstateに保存
+      setDrawingImage(finalImageUrl) // 変換された画像を設定
+      setDrawingImageS3Key(data.s3Key)
       setBoxes(data.boxes || [])
       setMeasurements(data.measurements || [])
       setViewTransform(data.viewTransform || { scale: 1, translateX: 0, translateY: 0 })
+      setApprovalStamps(data.approvalStamps || []) // 承認印も復元
 
       if (data.settings) {
         setDefaultDecimalPlaces(data.settings.defaultDecimalPlaces)
@@ -2576,6 +2594,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       setBoxes(saveData.boxes || [])
       setMeasurements(saveData.measurements || [])
       setViewTransform(saveData.viewTransform || { scale: 1, translateX: 0, translateY: 0 })
+      setApprovalStamps(saveData.approvalStamps || [])
 
       // 設定を復元
       if (saveData.settings) {
@@ -3050,8 +3069,6 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           : isDragging
             ? 'grabbing' // ドラッグ中
             : 'grab', // ドラッグ可能
-        writingMode: isVertical ? ('vertical-rl' as const) : ('horizontal-tb' as const),
-        textOrientation: isVertical ? ('upright' as const) : ('mixed' as const),
         userSelect: 'none' as const,
         fontSize: `${fontSize}px`,
         fontFamily: '"Noto Sans JP", sans-serif',
@@ -3887,10 +3904,17 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                             <span
                               style={{
                                 ...styles.boxValue(textColorMode, box.isOutOfTolerance),
-                                // 小さいボックスでも見やすくするための追加スタイル
+                                // 縦型の場合は90度回転
+                                ...(isVertical
+                                  ? {
+                                      transform: 'rotate(270deg)',
+                                      display: 'inline-block',
+                                      whiteSpace: 'nowrap',
+                                    }
+                                  : {}),
                                 textShadow:
                                   box.isOutOfTolerance && minBoxDimension < 50
-                                    ? '0 0 2px white, 0 0 4px white' // 白い縁取りで文字を読みやすく
+                                    ? '0 0 2px white, 0 0 4px white'
                                     : 'none',
                               }}
                             >
