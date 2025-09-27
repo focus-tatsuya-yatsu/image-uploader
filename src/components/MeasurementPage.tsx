@@ -1994,21 +1994,16 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           ctx.textBaseline = 'middle'
 
           if (isVertical) {
-            // 縦書き処理
+            // 縦書き処理 - 270度回転
             ctx.save()
             ctx.translate(box.x + box.width / 2, box.y + box.height / 2)
 
-            // 文字を一つずつ縦に配置
-            const chars = formattedValue.split('')
-            const charSpacing = fontSize * 1.2 // フォントサイズの1.2倍の間隔
-            const totalHeight = charSpacing * chars.length
-            const startY = -totalHeight / 2 + charSpacing / 2
+            // 270度回転を明示的に指定
+            ctx.rotate((270 * Math.PI) / 180) // 270度を明示的にラジアンに変換
+            // または以下でも同じ
+            // ctx.rotate(3 * Math.PI / 2) // 270度 = 3π/2
 
-            chars.forEach((char, i) => {
-              const y = startY + charSpacing * i
-              ctx.fillText(char, 0, y)
-            })
-
+            ctx.fillText(formattedValue, 0, 0)
             ctx.restore()
           } else {
             // 横書き
@@ -2018,8 +2013,6 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       })
 
       // 承認印の描画
-      // 承認印の描画（最終修正版）
-      // 承認印の描画（完全修正版）
       approvalStamps.forEach((stamp) => {
         // 座標とサイズの計算（viewTransform適用）
         const stampX = stamp.x
