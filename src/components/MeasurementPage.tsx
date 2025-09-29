@@ -126,8 +126,20 @@ const SaveDialog: React.FC<{
 
     const getDefaultFileName = () => {
       const now = new Date()
-      const dateStr = now.toISOString().slice(0, 10)
-      const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
+
+      // 年月日を日本のローカル時刻で取得
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0') // getMonth()は0から始まるので+1
+      const day = String(now.getDate()).padStart(2, '0')
+
+      // 時分を日本のローカル時刻で取得
+      const hours = String(now.getHours()).padStart(2, '0')
+      const minutes = String(now.getMinutes()).padStart(2, '0')
+
+      // 正しい形式の文字列を組み立てる
+      const dateStr = `${year}-${month}-${day}`
+      const timeStr = `${hours}-${minutes}`
+
       return `図面_${dateStr}_${timeStr}`
     }
 
@@ -2080,8 +2092,20 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
       const getDefaultFileName = () => {
         const now = new Date()
-        const dateStr = now.toISOString().slice(0, 10)
-        const timeStr = now.toTimeString().slice(0, 5).replace(':', '-')
+
+        // 年月日を日本のローカル時刻で取得
+        const year = now.getFullYear()
+        const month = String(now.getMonth() + 1).padStart(2, '0') // getMonth()は0から始まるので+1
+        const day = String(now.getDate()).padStart(2, '0')
+
+        // 時分を日本のローカル時刻で取得
+        const hours = String(now.getHours()).padStart(2, '0')
+        const minutes = String(now.getMinutes()).padStart(2, '0')
+
+        // 正しい形式の文字列を組み立てる
+        const dateStr = `${year}-${month}-${day}`
+        const timeStr = `${hours}-${minutes}`
+
         return `測定結果_${dateStr}_${timeStr}`
       }
 
@@ -4539,7 +4563,6 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           >
             <h2
               style={{
-                marginBottom: '20px',
                 color: '#333',
                 display: 'flex',
                 alignItems: 'center',
@@ -4548,6 +4571,16 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
             >
               ☁️ クラウドに保存されたファイル
             </h2>
+            <p
+              style={{
+                marginBottom: '20px',
+                color: '#333',
+                fontSize: '.8rem',
+                paddingLeft: '2.5rem',
+              }}
+            >
+              表示件数２０件まで・保存期間３０日間
+            </p>
 
             {savedWorkStates.length > 0 && (
               <div
