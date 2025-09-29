@@ -1574,8 +1574,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
             }
 
             // 承認印用の最小サイズ制限（ボックスより大きめ）
-            const minStampWidth = 200 // 承認印の最小幅
-            const minStampHeight = 150 // 承認印の最小高さ
+            const minStampWidth = 20 // 承認印の最小幅
+            const minStampHeight = 20 // 承認印の最小高さ
 
             if (newWidth < minStampWidth) {
               newWidth = minStampWidth
@@ -1907,76 +1907,53 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     }
 
     try {
-      // UIを一時的に非表示
       setHoveredBox(null)
       hideContextMenu()
       setEditingBoxId(null)
-      // setShowBoxNumbers(false)
-      // setShowDeleteButtons(false)
 
-      // 高解像度設定
       const scale = 3
       const rect = canvasRef.current.getBoundingClientRect()
       exportCanvas.width = rect.width * scale
       exportCanvas.height = rect.height * scale
       ctx.scale(scale, scale)
 
-      // 背景を白に
       ctx.fillStyle = 'white'
       ctx.fillRect(0, 0, rect.width, rect.height)
 
-      // 背景画像を描画
       if (drawingImage) {
         const img = new Image()
-
         try {
           let finalImageUrl = drawingImage
-
-          // S3キーの有無で判断し、キーを渡す
           if (drawingImageS3Key) {
             console.log('S3画像検出、Lambda経由で取得中...')
-            // S3キーを渡してBase64画像を取得
             finalImageUrl = await measurementAPI.getImageAsBase64(drawingImageS3Key)
             console.log('Lambda経由で画像取得成功')
           }
-          // 画像を描画
           img.src = finalImageUrl
           await new Promise((resolve, reject) => {
             img.onload = resolve
             img.onerror = reject
           })
-
           ctx.drawImage(img, 0, 0, rect.width, rect.height)
         } catch (error) {
           console.error('画像処理エラー:', error)
-
-          // エラー時は処理を中断し、ユーザーに通知
           alert(
             '画像の読み込みに失敗しました。\nPDF保存を中断します。\n\nエラー内容：' +
               (error as Error).message
           )
-
-          // finally節で状態リセット処理が行われるため、ここでthrowして処理を中断
           throw new Error('画像読み込みエラーにより処理を中断')
         }
       }
 
-      // ボックスとテキストを手動で描画
       boxes.forEach((box) => {
-        // ボックスの枠を描画
         ctx.strokeStyle = box.isOutOfTolerance ? '#ff0000' : '#ff6b6b'
         ctx.lineWidth = calculateBorderWidth(box.width, box.height, 1)
         ctx.strokeRect(box.x, box.y, box.width, box.height)
-
-        // 背景色
         ctx.fillStyle = box.isOutOfTolerance ? 'rgba(255, 0, 0, 0.1)' : 'rgba(255, 107, 107, 0.1)'
         ctx.fillRect(box.x, box.y, box.width, box.height)
-
-        // テキストを描画
         if (box.value) {
           const formattedValue = formatValue(box.value, box.decimalPlaces)
           const isVertical = box.height > box.width * 1.5
-
           const fontSize = calculateOptimalFontSize(
             formattedValue,
             box.width,
@@ -1986,262 +1963,89 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           )
           ctx.font = `bold ${fontSize}px "Noto Sans JP", sans-serif`
           ctx.fillStyle = box.isOutOfTolerance
-            ? '#ff0000' // 許容範囲外なら赤色
+            ? '#ff0000'
             : textColorMode === 'white'
               ? '#ffffff'
-              : '#333333' // そうでなければ通常の色
+              : '#333333'
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-
           if (isVertical) {
-            // 縦書き処理 - 270度回転
             ctx.save()
             ctx.translate(box.x + box.width / 2, box.y + box.height / 2)
-
-            // 270度回転を明示的に指定
-            ctx.rotate((270 * Math.PI) / 180) // 270度を明示的にラジアンに変換
-            // または以下でも同じ
-            // ctx.rotate(3 * Math.PI / 2) // 270度 = 3π/2
-
+            ctx.rotate((270 * Math.PI) / 180)
             ctx.fillText(formattedValue, 0, 0)
             ctx.restore()
           } else {
-            // 横書き
             ctx.fillText(formattedValue, box.x + box.width / 2, box.y + box.height / 2)
           }
         }
       })
 
-      // 承認印の描画
-      approvalStamps.forEach((stamp) => {
-        // 座標とサイズの計算（viewTransform適用）
-        const stampX = stamp.x
-        const stampY = stamp.y
-        const stampWidth = stamp.width
-        const stampHeight = stamp.height
-
-        // ApprovalStamp.tsxと同じスケール計算
-        const baseWidth = 400
-        const baseHeight = 330
-        const stampScale = Math.min(stampWidth / baseWidth, stampHeight / baseHeight, 1)
-
-        // 白背景
-        ctx.fillStyle = 'white'
-        ctx.fillRect(stampX, stampY, stampWidth, stampHeight)
-
-        // 外枠（3px）
-        ctx.strokeStyle = '#ff0000'
-        ctx.lineWidth = 3
-        ctx.strokeRect(stampX, stampY, stampWidth, stampHeight)
-
-        // 1. タイトルと日付セクション
-        const headerHeight = Math.max(40, 80 * stampScale)
-
-        // 横線（タイトル下）
-        ctx.strokeStyle = '#ff0000'
-        ctx.lineWidth = 3
-        ctx.beginPath()
-        ctx.moveTo(stampX, stampY + headerHeight)
-        ctx.lineTo(stampX + stampWidth, stampY + headerHeight)
-        ctx.stroke()
-
-        // タイトル（letterSpacing適用）
-        ctx.save()
-        ctx.fillStyle = '#ff0000'
-        const titleFontSize = Math.max(12, 24 * stampScale)
-        ctx.font = `bold ${titleFontSize}px "游明朝", "Yu Mincho", serif`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'top'
-
-        // レタースペーシングを手動で実装
-        const title = stamp.data.title || '検査成績表'
-        if (stampScale > 0.3) {
-          const letterSpacing = 0.3 * stampScale * titleFontSize
-          const titleChars = title.split('')
-          const totalWidth =
-            titleChars.length * titleFontSize + (titleChars.length - 1) * letterSpacing
-          let currentX = stampX + (stampWidth - totalWidth) / 2 + titleFontSize / 2
-
-          titleChars.forEach((char, index) => {
-            ctx.fillText(char, currentX, stampY + 10 * stampScale)
-            currentX += titleFontSize + letterSpacing
-          })
-        } else {
-          ctx.fillText(title, stampX + stampWidth / 2, stampY + 10 * stampScale)
-        }
-        ctx.restore()
-
-        // 日付（右寄せ）
-        const dateFontSize = Math.max(7, 14 * stampScale)
-        ctx.font = `${dateFontSize}px "游明朝", "Yu Mincho", serif`
-        ctx.textAlign = 'right'
-        ctx.fillStyle = '#ff0000'
-        const dateY = stampY + headerHeight - 20 * stampScale
-        ctx.fillText(stamp.data.date || '2025/10/01', stampX + stampWidth - 15 * stampScale, dateY)
-
-        // 2. 会社名セクション
-        const companyHeight = Math.max(25, 50 * stampScale)
-        const companyY = stampY + headerHeight
-
-        // 横線（会社名下）
-        ctx.strokeStyle = '#ff0000'
-        ctx.lineWidth = 3
-        ctx.beginPath()
-        ctx.moveTo(stampX, companyY + companyHeight)
-        ctx.lineTo(stampX + stampWidth, companyY + companyHeight)
-        ctx.stroke()
-
-        // 会社名（letterSpacing適用）
-        ctx.save()
-        const companyFontSize = Math.max(7, 18 * stampScale)
-        ctx.font = `bold ${companyFontSize}px "游明朝", "Yu Mincho", serif`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillStyle = '#ff0000'
-
-        const companyName = stamp.data.companyName || '協立機興株式会社'
-        const companyLetterSpacing = 0.5 * stampScale * companyFontSize
-        const companyChars = companyName.split('')
-        const companyTotalWidth =
-          companyChars.length * companyFontSize + (companyChars.length - 1) * companyLetterSpacing
-        let companyCurrentX = stampX + (stampWidth - companyTotalWidth) / 2 + companyFontSize / 2
-
-        companyChars.forEach((char) => {
-          ctx.fillText(char, companyCurrentX, companyY + companyHeight / 2)
-          companyCurrentX += companyFontSize + companyLetterSpacing
-        })
-        ctx.restore()
-
-        // 3. 承認欄セクション
-        const stampsY = companyY + companyHeight
-        const stampsHeight =
-          stampHeight -
-          headerHeight -
-          companyHeight -
-          (stampScale > 0.25 ? Math.max(20, 50 * stampScale) : 0)
-        const columnWidth = stampWidth / 3
-
-        // 縦線
-        ctx.strokeStyle = '#ff0000'
-        ctx.lineWidth = 2
-        for (let i = 1; i < 3; i++) {
-          ctx.beginPath()
-          ctx.moveTo(stampX + columnWidth * i, stampsY)
-          ctx.lineTo(stampX + columnWidth * i, stampsY + stampsHeight)
-          ctx.stroke()
-        }
-
-        // ヘッダー横線
-        const stampHeaderHeight = Math.max(20, 40 * stampScale)
-        ctx.strokeStyle = '#ff0000'
-        ctx.lineWidth = 2
-        ctx.beginPath()
-        ctx.moveTo(stampX, stampsY + stampHeaderHeight)
-        ctx.lineTo(stampX + stampWidth, stampsY + stampHeaderHeight)
-        ctx.stroke()
-
-        // 承認・確認・作成
-        const stampTypes = [
-          { key: 'approval', label: '承認' },
-          { key: 'confirmation', label: '確認' },
-          { key: 'creation', label: '作成' },
-        ]
-
-        stampTypes.forEach((type, index) => {
-          const centerX = stampX + columnWidth * index + columnWidth / 2
-
-          // ラベル
-          ctx.fillStyle = '#ff0000'
-          ctx.font = `bold ${Math.max(8, 14 * stampScale)}px "游明朝", "Yu Mincho", serif`
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillText(type.label, centerX, stampsY + stampHeaderHeight / 2)
-
-          // 印鑑部分
-          const stampAreaY = stampsY + stampHeaderHeight
-          const stampAreaHeight = stampsHeight - stampHeaderHeight
-          const stampCenterY = stampAreaY + stampAreaHeight / 2
-
-          const name = stamp.data.stamps[type.key as keyof typeof stamp.data.stamps]
-          if (name) {
-            // 印鑑の円（大きめに調整）
-            const stampRadius = Math.min(40, Math.max(10, 40 * stampScale))
-
-            ctx.strokeStyle = '#ff0000'
-            ctx.lineWidth = Math.max(1, 2 * stampScale)
-            ctx.beginPath()
-            ctx.arc(centerX, stampCenterY, stampRadius, 0, Math.PI * 2)
-            ctx.stroke()
-
-            // 名前（ApprovalStamp.tsxのgetFontSize関数と同じロジック）
-            const nameLength = name.length
-            let fontSize: number
-            if (nameLength <= 2) {
-              fontSize = stampRadius * 0.9
-            } else if (nameLength === 3) {
-              fontSize = stampRadius * 0.6
-            } else if (nameLength === 4) {
-              fontSize = stampRadius * 0.43
-            } else if (nameLength === 5) {
-              fontSize = stampRadius * 0.38
-            } else {
-              fontSize = stampRadius * 0.35
-            }
-
-            ctx.fillStyle = '#ff0000'
-            ctx.font = `bold ${Math.max(1, fontSize)}px serif`
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillText(name, centerX, stampCenterY)
+      // ★ 承認印の描画 (ユーザー調整デザインの完全反映版)
+      const stampImagePromises = approvalStamps.map((stamp) => {
+        return new Promise<HTMLImageElement>((resolve, reject) => {
+          // ユーザーが調整したStampMarkのロジックをここに再現
+          const getStampFontSize = (name: string | null): number => {
+            if (!name) return 18
+            const len = name.length
+            if (len <= 2) return 40
+            if (len === 3) return 30
+            if (len === 4) return 22
+            return 18
           }
+
+          // SVG文字列をApprovalStamp.tsxの内容と完全に同期させる
+          const svgString = `
+            <svg width="${stamp.width}" height="${stamp.height}" viewBox="0 0 400 330" xmlns="http://www.w3.org/2000/svg" style="font-family: 'Yu Mincho', serif;">
+              <style>
+                text { fill: #ff0000; }
+                .stamp-name { font-weight: bold; }
+                .title { font-size: 24px; font-weight: bold; letter-spacing: 10px; }
+                .company { font-size: 18px; font-weight: bold; letter-spacing: 15px; }
+              </style>
+              <rect x="0" y="0" width="400" height="330" fill="white" stroke="#ff0000" stroke-width="4" />
+              <text x="200" y="40" text-anchor="middle" dominant-baseline="middle" class="title">${stamp.data.title || '検査成績表'}</text>
+              <text x="385" y="65" text-anchor="end" font-size="14">${stamp.data.date || ''}</text>
+              <line x1="0" y1="80" x2="400" y2="80" stroke="#ff0000" stroke-width="2" />
+              <text x="200" y="105" text-anchor="middle" dominant-baseline="middle" class="company">${stamp.data.companyName || '協立機興株式会社'}</text>
+              <line x1="0" y1="130" x2="400" y2="130" stroke="#ff0000" stroke-width="2" />
+              <line x1="0" y1="170" x2="400" y2="170" stroke="#ff0000" stroke-width="1.5" />
+              <text x="66.5" y="150" text-anchor="middle" dominant-baseline="middle" font-size="14" font-weight="bold">承認</text>
+              <text x="200" y="150" text-anchor="middle" dominant-baseline="middle" font-size="14" font-weight="bold">確認</text>
+              <text x="333.5" y="150" text-anchor="middle" dominant-baseline="middle" font-size="14" font-weight="bold">作成</text>
+
+              ${stamp.data.stamps.approval ? `<g transform="translate(41.5, 200)"><circle cx="27" cy="25" r="50" stroke="#ff0000" stroke-width="1.5" fill="none"/><text x="28" y="28" text-anchor="middle" dominant-baseline="middle" class="stamp-name" font-size="${getStampFontSize(stamp.data.stamps.approval)}">${stamp.data.stamps.approval}</text></g>` : ''}
+              ${stamp.data.stamps.confirmation ? `<g transform="translate(175, 200)"><circle cx="27" cy="25" r="50" stroke="#ff0000" stroke-width="1.5" fill="none"/><text x="28" y="28" text-anchor="middle" dominant-baseline="middle" class="stamp-name" font-size="${getStampFontSize(stamp.data.stamps.confirmation)}">${stamp.data.stamps.confirmation}</text></g>` : ''}
+              ${stamp.data.stamps.creation ? `<g transform="translate(308.5, 200)"><circle cx="27" cy="25" r="50" stroke="#ff0000" stroke-width="1.5" fill="none"/><text x="28" y="28" text-anchor="middle" dominant-baseline="middle" class="stamp-name" font-size="${getStampFontSize(stamp.data.stamps.creation)}">${stamp.data.stamps.creation}</text></g>` : ''}
+              
+              <line x1="133" y1="130" x2="133" y2="280" stroke="#ff0000" stroke-width="1.5" />
+              <line x1="266" y1="130" x2="266" y2="280" stroke="#ff0000" stroke-width="1.5" />
+              <line x1="0" y1="280" x2="400" y2="280" stroke="#ff0000" stroke-width="2" />
+              <text x="20" y="305" dominant-baseline="middle" font-size="16" font-weight="bold">受注番号</text>
+              <line x1="133" y1="280" x2="133" y2="330" stroke="#ff0000" stroke-width="1.5" />
+              <text x="145" y="305" dominant-baseline="middle" font-size="16" font-weight="bold" letter-spacing="2">${stamp.data.orderNo || ''}</text>
+            </svg>
+          `
+
+          const img = new Image()
+          img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)))
+
+          img.onload = () => resolve(img)
+          img.onerror = (err) => reject(err)
         })
-
-        // 4. 受注番号セクション（stampScale > 0.25の場合のみ）
-        if (stampScale > 0.25) {
-          const orderHeight = Math.max(20, 50 * stampScale)
-          const orderY = stampY + stampHeight - orderHeight
-
-          // 上部横線
-          ctx.strokeStyle = '#ff0000'
-          ctx.lineWidth = 3
-          ctx.beginPath()
-          ctx.moveTo(stampX, orderY)
-          ctx.lineTo(stampX + stampWidth, orderY)
-          ctx.stroke()
-
-          // 縦線の位置（ApprovalStamp.tsxと同じ計算）
-          const vertLineX = stampX + Math.max(50, 138 * stampScale)
-          ctx.strokeStyle = '#ff0000'
-          ctx.lineWidth = 2
-          ctx.beginPath()
-          ctx.moveTo(vertLineX, orderY)
-          ctx.lineTo(vertLineX, stampY + stampHeight)
-          ctx.stroke()
-
-          // テキスト
-          const orderTextY = orderY + orderHeight / 2
-          ctx.fillStyle = '#ff0000'
-          ctx.font = `bold ${Math.max(8, 16 * stampScale)}px "游明朝", "Yu Mincho", serif`
-
-          // "受注番号"ラベル
-          ctx.textAlign = 'left'
-          ctx.textBaseline = 'middle'
-          const labelText = stampScale > 0.35 ? '受注番号' : '受注'
-          ctx.fillText(labelText, stampX + Math.max(4, 8 * stampScale), orderTextY)
-
-          // 受注番号の値
-          if (stamp.data.orderNo) {
-            ctx.textAlign = 'left'
-            ctx.fillText(stamp.data.orderNo, vertLineX + Math.max(20, 40 * stampScale), orderTextY)
-          }
-        }
       })
-      // PDFを生成
+
+      const loadedStampImages = await Promise.all(stampImagePromises)
+
+      loadedStampImages.forEach((img, index) => {
+        const stamp = approvalStamps[index]
+        ctx.drawImage(img, stamp.x, stamp.y, stamp.width, stamp.height)
+      })
+
       const pdf = new jsPDF('landscape', 'mm', 'a4')
       const imgData = exportCanvas.toDataURL('image/png')
       pdf.addImage(imgData, 'PNG', 0, 0, 297, 210)
 
-      // ファイル名を決定（デフォルトファイル名の生成）
       const getDefaultFileName = () => {
         const now = new Date()
         const dateStr = now.toISOString().slice(0, 10)
@@ -2251,50 +2055,34 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
       const finalFileName = saveFileName || getDefaultFileName()
 
-      // File System Access APIをサポートしているか確認
       if ('showSaveFilePicker' in window) {
         try {
-          // ネイティブの保存ダイアログを表示
           const handle = await (window as any).showSaveFilePicker({
             suggestedName: `${finalFileName}.pdf`,
-            types: [
-              {
-                description: 'PDFファイル',
-                accept: { 'application/pdf': ['.pdf'] },
-              },
-            ],
+            types: [{ description: 'PDFファイル', accept: { 'application/pdf': ['.pdf'] } }],
             startIn: 'downloads',
           })
-
           const writable = await handle.createWritable()
           const pdfBlob = pdf.output('blob')
           await writable.write(pdfBlob)
           await writable.close()
-
-          // 成功メッセージ
           alert('✅ PDFを保存しました！')
         } catch (err: any) {
-          // ユーザーがキャンセルした場合
           if (err.name === 'AbortError') {
             console.log('保存がキャンセルされました')
           } else {
             console.error('保存エラー:', err)
-            // エラー時はフォールバック
             pdf.save(`${finalFileName}.pdf`)
             alert('⚠️ ネイティブ保存に失敗したため、通常のダウンロードで保存しました。')
           }
         }
       } else {
-        // File System Access API非対応のブラウザ
         pdf.save(`${finalFileName}.pdf`)
         alert('📥 PDFをダウンロードフォルダに保存しました！')
       }
 
-      // UIを再表示
       setShowBoxNumbers(true)
       setShowDeleteButtons(true)
-
-      // ダイアログを閉じる
       setShowSaveDialog(false)
       setSaveFileName('')
     } catch (error) {
@@ -2304,7 +2092,6 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       setIsSaving(false)
     }
   }
-
   // 結果を保存
   const exportResult = async () => {
     // 保存ダイアログを表示
@@ -4007,7 +3794,6 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
                           setApprovalStamps((prev) => prev.filter((s) => s.id !== id))
                         }}
                         isDragging={draggedBoxId === stamp.id}
-                        textColorMode={textColorMode}
                         showDeleteButtons={showDeleteButtons}
                       />
 
