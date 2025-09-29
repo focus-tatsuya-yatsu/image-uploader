@@ -1898,6 +1898,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       return
     }
 
+    const xOffset = 8 // 右にずらす量（マイナスにすると左にずれます）
+        const yOffset = 4 // 下にずらす量（マイナスにすると上にずれます）
     const exportCanvas = document.createElement('canvas')
     const ctx = exportCanvas.getContext('2d')
 
@@ -1948,9 +1950,9 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       boxes.forEach((box) => {
         ctx.strokeStyle = box.isOutOfTolerance ? '#ff0000' : '#ff6b6b'
         ctx.lineWidth = calculateBorderWidth(box.width, box.height, 1)
-        ctx.strokeRect(box.x, box.y, box.width, box.height)
+        ctx.strokeRect(box.x + xOffset, box.y + yOffset, box.width, box.height)
         ctx.fillStyle = box.isOutOfTolerance ? 'rgba(255, 0, 0, 0.1)' : 'rgba(255, 107, 107, 0.1)'
-        ctx.fillRect(box.x, box.y, box.width, box.height)
+        ctx.fillRect(box.x + xOffset, box.y + yOffset, box.width, box.height)
         if (box.value) {
           const formattedValue = formatValue(box.value, box.decimalPlaces)
           const isVertical = box.height > box.width * 1.5
@@ -1971,12 +1973,12 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
           ctx.textBaseline = 'middle'
           if (isVertical) {
             ctx.save()
-            ctx.translate(box.x + box.width / 2, box.y + box.height / 2)
+            ctx.translate(box.x + xOffset + box.width / 2, box.y + yOffset + box.height / 2)
             ctx.rotate((270 * Math.PI) / 180)
             ctx.fillText(formattedValue, 0, 0)
             ctx.restore()
           } else {
-            ctx.fillText(formattedValue, box.x + box.width / 2, box.y + box.height / 2)
+            ctx.fillText(formattedValue, box.x + xOffset + box.width / 2, box.y + yOffset + box.height / 2)
           }
         }
       })
@@ -2039,7 +2041,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
       loadedStampImages.forEach((img, index) => {
         const stamp = approvalStamps[index]
-        ctx.drawImage(img, stamp.x, stamp.y, stamp.width, stamp.height)
+
+        ctx.drawImage(img, stamp.x + xOffset, stamp.y + yOffset, stamp.width, stamp.height);
       })
 
       const pdf = new jsPDF('landscape', 'mm', 'a4')
