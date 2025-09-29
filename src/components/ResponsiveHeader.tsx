@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 interface ResponsiveHeaderProps {
   user: any
@@ -172,11 +173,26 @@ const ResponsiveHeader: React.FC<ResponsiveHeaderProps> = ({
           </div>
 
           {/* 中央：タイトル */}
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <h1 style={{ margin: '0', fontSize: '24px' }}>図面測定値転記システム</h1>
-            <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>CalypsoとZEISS両形式のPDFに対応</p>
-          </div>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '15px',
+            }}
+          >
+            {/* ここにロゴを追加 */}
+            <Image src="/logo.svg" alt="アプリケーションロゴ" width={75} height={62} />
 
+            {/* タイトルとサブタイトルをdivでまとめる */}
+            <div style={{ textAlign: 'left' }}>
+              <h1 style={{ margin: '0', fontSize: '24px' }}>図面測定値転記システム</h1>
+              <p style={{ margin: '5px 0 0 0', fontSize: '14px' }}>
+                CalypsoとZEISS両形式のPDFに対応
+              </p>
+            </div>
+          </div>
           {/* 右側：スペース確保 */}
           <div style={{ width: '300px' }}></div>
         </div>
