@@ -1898,8 +1898,8 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       return
     }
 
-    const xOffset = 8 // 右にずらす量（マイナスにすると左にずれます）
-        const yOffset = 4 // 下にずらす量（マイナスにすると上にずれます）
+    const xOffset = 1 // 右にずらす量（マイナスにすると左にずれます）
+    const yOffset = 1 // 下にずらす量（マイナスにすると上にずれます）
     const exportCanvas = document.createElement('canvas')
     const ctx = exportCanvas.getContext('2d')
 
@@ -1925,6 +1925,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       if (drawingImage) {
         const img = new Image()
         try {
+          // 画像のURLを決定し、読み込みを開始する
           let finalImageUrl = drawingImage
           if (drawingImageS3Key) {
             console.log('S3画像検出、Lambda経由で取得中...')
@@ -1932,11 +1933,35 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
             console.log('Lambda経由で画像取得成功')
           }
           img.src = finalImageUrl
+
+          // 読み込みが完了するまで待つ
           await new Promise((resolve, reject) => {
             img.onload = resolve
             img.onerror = reject
           })
-          ctx.drawImage(img, 0, 0, rect.width, rect.height)
+
+          // 読み込みが終わった画像を使って、正しいサイズと位置を計算する
+          const canvasAspectRatio = rect.width / rect.height
+          const imageAspectRatio = img.naturalWidth / img.naturalHeight
+          let drawWidth = rect.width
+          let drawHeight = rect.height
+          let offsetX = 0
+          let offsetY = 0
+
+          if (imageAspectRatio > canvasAspectRatio) {
+            drawHeight = rect.width / imageAspectRatio
+            offsetY = (rect.height - drawHeight) / 2
+          } else {
+            drawWidth = rect.height * imageAspectRatio
+            offsetX = (rect.width - drawWidth) / 2
+          }
+
+          // 白い背景で塗りつぶし
+          ctx.fillStyle = 'white'
+          ctx.fillRect(0, 0, rect.width, rect.height)
+
+          // 計算した値を使って、正しい比率で画像を描画する
+          ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight)
         } catch (error) {
           console.error('画像処理エラー:', error)
           alert(
@@ -1949,7 +1974,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
 
       boxes.forEach((box) => {
         ctx.strokeStyle = box.isOutOfTolerance ? '#ff0000' : '#ff6b6b'
-        ctx.lineWidth = calculateBorderWidth(box.width, box.height, 1)
+        ctx.lineWidth = calculateBorderWidth(box.width, box.height, 1) / scale
         ctx.strokeRect(box.x + xOffset, box.y + yOffset, box.width, box.height)
         ctx.fillStyle = box.isOutOfTolerance ? 'rgba(255, 0, 0, 0.1)' : 'rgba(255, 107, 107, 0.1)'
         ctx.fillRect(box.x + xOffset, box.y + yOffset, box.width, box.height)
@@ -1978,7 +2003,11 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
             ctx.fillText(formattedValue, 0, 0)
             ctx.restore()
           } else {
-            ctx.fillText(formattedValue, box.x + xOffset + box.width / 2, box.y + yOffset + box.height / 2)
+            ctx.fillText(
+              formattedValue,
+              box.x + xOffset + box.width / 2,
+              box.y + yOffset + box.height / 2
+            )
           }
         }
       })
@@ -2042,7 +2071,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
       loadedStampImages.forEach((img, index) => {
         const stamp = approvalStamps[index]
 
-        ctx.drawImage(img, stamp.x + xOffset, stamp.y + yOffset, stamp.width, stamp.height);
+        ctx.drawImage(img, stamp.x + xOffset, stamp.y + yOffset, stamp.width, stamp.height)
       })
 
       const pdf = new jsPDF('landscape', 'mm', 'a4')
@@ -2735,7 +2764,7 @@ const MeasurementPage: React.FC<MeasurementPageProps> = ({
     // スクロール可能なメインコンテンツ
     scrollableContent: {
       flex: 1,
-      overflowY: 'auto' as const,
+      overflowY: 'scroll' as const,
       overflowX: 'hidden' as const,
     },
     mainContent: {
